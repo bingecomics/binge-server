@@ -395,7 +395,7 @@ button.
 
 Done on 2026-11-19: the server on the NAS went from 0.2.0 to 0.2.1 with the
 button, in the same container. The page said nothing clear afterwards, so
-it now says that the server was updated.
+it now says that the server was updated. Release 0.2.2 carries that.
 
 Also built here (2026-11-17), ahead of the AI work it is for: import and
 the layout from the database
