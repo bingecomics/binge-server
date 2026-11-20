@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
-import { useIsOwner } from "../api/account";
+import { useOthers } from "../api/account";
 import { gotNoAnswer } from "../api/client";
 import { useDeleteList, useListBooks, useReadingList } from "../api/lists";
 import { BooksHeader } from "../components/BooksHeader";
@@ -13,7 +13,9 @@ import { ListDetailsDialog } from "../components/ListDetailsDialog";
 import { MenuItem } from "../components/Menu";
 import { NotOnServer, ServerNotAnswering } from "../components/Notice";
 import { BooksMenu } from "../components/ReadMarks";
-import { ErrorText, upLinkClass } from "../components/text";
+import { ShareListDialog } from "../components/ShareListDialog";
+import { ErrorText, textLinkClass, upLinkClass } from "../components/text";
+import { sharedWith } from "../format";
 
 export const Route = createFileRoute("/lists/$listId")({
   params: {
@@ -27,14 +29,20 @@ export const Route = createFileRoute("/lists/$listId")({
  * One reading list: what its books say together, the way to go on where
  * the reader stopped, and its books in their order. Reading from here
  * follows the list from one series to the next.
+ *
+ * The one whose list it is changes it and says who else sees it. Anyone
+ * else reads it and is told whose it is. On a server of one person there
+ * is nobody to share with, and nothing about sharing is shown.
  */
 function ListPage() {
   const { listId } = Route.useParams();
   const overview = useReadingList(listId);
   const books = useListBooks(listId);
-  const owner = useIsOwner();
+  // Only the one whose list it is shares it, so only they need the names.
+  const others = useOthers({ enabled: overview.data?.list.mine === true });
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const remove = useDeleteList(() => navigate({ to: "/lists", replace: true }));
 
@@ -46,12 +54,14 @@ function ListPage() {
       <ServerNotAnswering />
     ) : (
       <NotOnServer title="This reading list is not on the server">
-        It may have been deleted, or it holds no book you can read.
+        It may have been deleted, it may not be shared with you, or it holds no book you can read.
       </NotOnServer>
     );
   }
 
   const { list } = overview.data;
+  const mine = list.mine;
+  const canShare = mine && others.length > 0;
   return (
     <>
       <BooksHeader
@@ -63,18 +73,32 @@ function ListPage() {
         bookCount={list.book_count}
         overview={overview.data}
         listId={list.id}
+        whose={
+          canShare ? (
+            <button type="button" className={textLinkClass} onClick={() => setSharing(true)}>
+              {sharedWith(list)}
+            </button>
+          ) : mine ? null : (
+            `${list.made_by.name}’s list`
+          )
+        }
         menu={
           <BooksMenu about={list.name} what={{ lists: [list.id] }} unreadCount={list.unread_count}>
-            {owner ? (
-              <MenuItem icon={Pencil} onSelect={() => setEditing(true)}>
-                Edit name and summary…
-              </MenuItem>
-            ) : null}
-            <CoverChoices of={{ kind: "lists", id: list.id }} chosen={list.cover_chosen} />
-            {owner ? (
-              <MenuItem icon={Trash2} onSelect={() => setDeleting(true)}>
-                Delete list…
-              </MenuItem>
+            {mine ? (
+              <>
+                <MenuItem icon={Pencil} onSelect={() => setEditing(true)}>
+                  Edit name and summary…
+                </MenuItem>
+                {canShare ? (
+                  <MenuItem icon={Users} onSelect={() => setSharing(true)}>
+                    Share…
+                  </MenuItem>
+                ) : null}
+                <CoverChoices of={{ kind: "lists", id: list.id }} chosen={list.cover_chosen} />
+                <MenuItem icon={Trash2} onSelect={() => setDeleting(true)}>
+                  Delete list…
+                </MenuItem>
+              </>
             ) : null}
           </BooksMenu>
         }
@@ -93,11 +117,11 @@ function ListPage() {
         <div className="mb-8">
           <p className="max-w-prose text-fg-muted text-metadata">
             This list has no books yet.
-            {owner
+            {mine
               ? " Add some from the menu of a book, a series or a group, or select several and add them together."
               : null}
           </p>
-          {owner ? (
+          {mine ? (
             <div className="-ml-4 mt-2 flex flex-wrap gap-2">
               <Button variant="quiet" onClick={() => setEditing(true)}>
                 <Pencil className="size-4" aria-hidden="true" />
@@ -111,10 +135,11 @@ function ListPage() {
           ) : null}
         </div>
       ) : books.data ? (
-        <ListBooks listId={list.id} books={books.data} />
+        <ListBooks listId={list.id} books={books.data} mine={mine} />
       ) : null}
 
       <ListDetailsDialog open={editing} onClose={() => setEditing(false)} list={list} />
+      <ShareListDialog open={sharing} onClose={() => setSharing(false)} list={list} />
       <ConfirmDialog
         open={deleting}
         onClose={() => {

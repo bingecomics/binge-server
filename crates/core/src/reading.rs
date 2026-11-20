@@ -282,8 +282,13 @@ impl Catalog {
         if which.named() > MOST_NAMED {
             return Err(CatalogError::Invalid(TOO_MANY_NAMED));
         }
-        // A book of a list is there by its identity, not by where it sits.
-        let in_lists = "reading_list_book lb JOIN book b ON b.content_hash = lb.content_hash";
+        // A book of a list is there by its identity, not by where it sits,
+        // and only a list `user` is shown names its books.
+        let in_lists = &format!(
+            "reading_list_book lb JOIN book b ON b.content_hash = lb.content_hash \
+             AND {}",
+            crate::lists::may_see("lb.list_id")
+        );
         let chosen = [
             (PLACED, "b.id", &which.books),
             (PLACED, "bp.group_id", &which.groups),

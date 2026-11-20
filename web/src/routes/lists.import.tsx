@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft, CircleAlert, CircleCheck, FileUp, Undo2 } from "lucide-react";
 import { memo, type ReactNode, useMemo, useState } from "react";
-import { useIsOwner } from "../api/account";
 import type { Book, CblEntry, CblLine, CblPlan } from "../api/client";
 import { useSearch } from "../api/libraries";
 import {
@@ -20,7 +19,6 @@ import { Form } from "../components/Form";
 import { placeClass } from "../components/ListBooks";
 import { ChoiceRow } from "../components/Menu";
 import { navHeadingClass } from "../components/NavLink";
-import { Notice } from "../components/Notice";
 import { rowClass } from "../components/Section";
 import { ErrorText, upLinkClass } from "../components/text";
 import { books as bookCount, called, count, titleUnder, yearOf } from "../format";
@@ -228,7 +226,7 @@ const Line = memo(function Line({
 
 /**
  * What a CBL file would make, before anything is made: each entry with the
- * book found for it and how. The owner fixes the ones that found none, or
+ * book found for it and how. The reader fixes the ones that found none, or
  * the wrong one, names the list and makes it.
  */
 function Plan({ plan, file, onChanged }: { plan: CblPlan; file: File; onChanged: () => void }) {
@@ -327,10 +325,9 @@ function Plan({ plan, file, onChanged }: { plan: CblPlan; file: File; onChanged:
 
 /**
  * Imports a reading list from a CBL file, as a dry run first: the file is
- * read and matched, and nothing is made until the owner says so.
+ * read and matched, and nothing is made until the reader says so.
  */
 function ImportPage() {
-  const owner = useIsOwner();
   const read = usePlanImport();
   /** The file as it was when it was chosen, so that it can be read again after a fix. */
   const [file, setFile] = useState<File | null>(null);
@@ -356,16 +353,6 @@ function ImportPage() {
       Reading lists
     </Link>
   );
-  if (!owner) {
-    return (
-      <>
-        {up}
-        <Notice icon={FileUp} title="Importing is the owner's to do">
-          Only the owner of this server makes reading lists.
-        </Notice>
-      </>
-    );
-  }
   return (
     <>
       {up}

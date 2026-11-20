@@ -1,7 +1,6 @@
 import { useLocation } from "@tanstack/react-router";
 import { ListChecks, ListPlus, X } from "lucide-react";
 import { useEffect } from "react";
-import { useIsOwner } from "../api/account";
 import { useMarkRead } from "../api/reading";
 import { count } from "../format";
 import { pickAll, pickedIds, pickNone, usePickedCount } from "../selection";
@@ -23,7 +22,6 @@ const saidClass = "max-md:sr-only";
 export function SelectionBar() {
   const picked = usePickedCount();
   const mark = useMarkRead(pickNone);
-  const owner = useIsOwner();
   const page = useLocation({ select: (location) => location.href });
   const picking = picked > 0;
 
@@ -74,15 +72,10 @@ export function SelectionBar() {
             <span className={saidClass}>{one}</span>
           </Button>
         ))}
-        {owner ? (
-          <Button
-            onClick={() => askToAddToList(pickedIds(), pickNone)}
-            title="Add to a reading list"
-          >
-            <ListPlus className="size-5" aria-hidden="true" />
-            <span className={saidClass}>Add to a list</span>
-          </Button>
-        ) : null}
+        <Button onClick={() => askToAddToList(pickedIds(), pickNone)} title="Add to a reading list">
+          <ListPlus className="size-5" aria-hidden="true" />
+          <span className={saidClass}>Add to a list</span>
+        </Button>
         <Button variant="quiet" onClick={pickAll} title="Select everything in this list">
           <ListChecks className="size-5" aria-hidden="true" />
           <span className={saidClass}>Select all</span>

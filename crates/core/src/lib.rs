@@ -32,7 +32,7 @@ pub mod views;
 #[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures;
 
-pub use accounts::{Account, AccountError, Accounts, ApiToken, User, UserId};
+pub use accounts::{Account, AccountError, Accounts, ApiToken, User, UserId, UserName};
 pub use backup::{BackupError, Backups, COPIES_KEPT, DatabaseCopy};
 pub use catalog::{
     Book, Catalog, CatalogError, Group, GroupKind, HeldFile, Library, PartOf, Series, Span,
@@ -45,7 +45,7 @@ pub use db::{Database, DbError};
 pub use history::{ReadWriter, ReadingDay, ReadingMonth, ReadingNow, ReadingYear};
 pub use kept::KeptPage;
 pub use layout::Place;
-pub use lists::{ReadingList, ReadingListOverview};
+pub use lists::{ReadingList, ReadingListOverview, Sharing};
 pub use narrow::{
     Choice, Choices, Letter, Named, NamedPerson, Narrowing, ReadState, SeriesOrder, SeriesSort,
     Years,

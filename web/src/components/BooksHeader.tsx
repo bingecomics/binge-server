@@ -221,6 +221,7 @@ export function BooksHeader({
   libraryId,
   listId,
   inGroup = false,
+  whose,
   menu,
   up,
 }: {
@@ -239,6 +240,8 @@ export function BooksHeader({
   listId?: number;
   /** The books are one group of a series: reading stops at the end of it. */
   inGroup?: boolean;
+  /** Whose a reading list is and who sees it, on a line of its own under the facts. */
+  whose?: ReactNode;
   /** The menu of what can be done with the books, beside the way to go on. */
   menu: ReactNode;
   /** The way back up to what holds the page, above everything else. */
@@ -284,6 +287,7 @@ export function BooksHeader({
             {read.page_count ? <span>{pages(read.page_count)}</span> : null}
             {time ? <span>{time}</span> : null}
           </p>
+          {whose ? <p className="mt-1 text-fg-muted text-metadata">{whose}</p> : null}
         </div>
 
         <div className="col-span-2 sm:col-span-1 sm:col-start-2">

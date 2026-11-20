@@ -221,6 +221,7 @@ impl From<CatalogError> for ApiError {
             CatalogError::InvalidPath(_) | CatalogError::InvalidPage | CatalogError::Invalid(_) => {
                 Some(ErrorCode::InvalidRequest)
             }
+            CatalogError::NotYours => Some(ErrorCode::Forbidden),
             CatalogError::AlreadyAdded
             | CatalogError::FileChanged(_)
             | CatalogError::NameTaken(_)

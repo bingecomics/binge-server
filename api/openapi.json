@@ -562,7 +562,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Lists the reading lists a book is in, in name order.",
+        "summary": "Lists the reading lists the caller sees that a book is in, in name\norder.",
         "operationId": "listReadingListsOfBook",
         "parameters": [
           {
@@ -3036,7 +3036,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Lists the reading lists in name order. A list that holds no book the\ncaller may read is left out, except for the owner.",
+        "summary": "Lists the reading lists the caller sees, in name order: their own, and\nthe ones shared with them or with everyone. A list of someone else's\nthat holds no book the caller may read is left out.",
         "operationId": "listReadingLists",
         "responses": {
           "200": {
@@ -3057,7 +3057,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Makes a reading list, with the books named in it from the start. Only\nthe owner can.",
+        "summary": "Makes a reading list of the caller's own, with the books named in it\nfrom the start. Nobody else sees it until it is shared.",
         "description": "Every book, group, series and list named must be on the server: one that\nis not, or a file that could not be read, refuses the request, and\nnothing is made. A book named twice is in the list once. One request\nnames 10,000 at most.",
         "operationId": "createReadingList",
         "requestBody": {
@@ -3090,18 +3090,8 @@
               }
             }
           },
-          "403": {
-            "description": "The caller is not the owner",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
           "409": {
-            "description": "Another list has the name; `conflicts_with` is its id",
+            "description": "Another list of the caller's has the name; `conflicts_with` is its id",
             "content": {
               "application/json": {
                 "schema": {
@@ -3118,8 +3108,8 @@
         "tags": [
           "lists"
         ],
-        "summary": "Reads a CBL file, the reading list format of ComicRack, and says which\nbook of the server each of its entries means and how that was found. It\nmakes nothing: the list is made with `POST /reading-lists`, from the\nbooks settled on. Only the owner can.",
-        "description": "The request's body is the file, of 5 MB and 5,000 entries at most. An\nentry's series is looked for by its name, by its name with the volume,\nwithout its article, and without the words for a kind of publication,\nin that order, until one finds a book with the entry's number. Among\nseveral books with the number, the entry's volume and year decide. A\nrule kept with `POST /reading-lists/import/rules` comes before all of\nthis.",
+        "summary": "Reads a CBL file, the reading list format of ComicRack, and says which\nbook of the server each of its entries means and how that was found. It\nmakes nothing: the list is made with `POST /reading-lists`, from the\nbooks settled on. The books are looked for among those the caller may\nread.",
+        "description": "The request's body is the file, of 5 MB and 5,000 entries at most. An\nentry's series is looked for by its name, by its name with the volume,\nwithout its article, and without the words for a kind of publication,\nin that order, until one finds a book with the entry's number. Among\nseveral books with the number, the entry's volume and year decide. A\nrule the caller kept with `POST /reading-lists/import/rules` comes\nbefore all of this.",
         "operationId": "planReadingListImport",
         "requestBody": {
           "description": "The CBL file",
@@ -3156,16 +3146,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "The caller is not the owner",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
           }
         }
       }
@@ -3175,7 +3155,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Keeps what the owner says an entry of a CBL file means, for the imports\nfrom now on: which series its series is, or which book the entry is. It\ntakes the place of the rule kept before for the same. Only the owner\ncan.",
+        "summary": "Keeps what the caller says an entry of a CBL file means, for their\nimports from now on: which series its series is, or which book the\nentry is. It takes the place of the rule they kept before for the same.\nEach person has their own rules.",
         "operationId": "keepImportRule",
         "requestBody": {
           "content": {
@@ -3206,16 +3186,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "The caller is not the owner",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
           }
         }
       }
@@ -3225,7 +3195,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Forgets a rule kept for imports. Only the owner can.",
+        "summary": "Forgets a rule the caller kept for their imports.",
         "operationId": "forgetImportRule",
         "parameters": [
           {
@@ -3241,16 +3211,6 @@
         ],
         "responses": {
           "204": {},
-          "403": {
-            "description": "The caller is not the owner",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
           "404": {
             "content": {
               "application/json": {
@@ -3307,7 +3267,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Deletes a reading list. Its books are not touched, nor is anyone's\nprogress in them. Only the owner can.",
+        "summary": "Deletes a reading list. Its books are not touched, nor is anyone's\nprogress in them. Only the one whose list it is can.",
         "operationId": "deleteReadingList",
         "parameters": [
           {
@@ -3324,7 +3284,7 @@
         "responses": {
           "204": {},
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The list is someone else's",
             "content": {
               "application/json": {
                 "schema": {
@@ -3348,7 +3308,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Gives a reading list another name and summary. Its books stay. Only the\nowner can.",
+        "summary": "Gives a reading list another name and summary. Its books stay. Only the\none whose list it is can.",
         "operationId": "changeReadingList",
         "parameters": [
           {
@@ -3393,7 +3353,7 @@
             }
           },
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The list is someone else's",
             "content": {
               "application/json": {
                 "schema": {
@@ -3412,7 +3372,7 @@
             }
           },
           "409": {
-            "description": "Another list has the name; `conflicts_with` is its id",
+            "description": "Another list of the caller's has the name; `conflicts_with` is its id",
             "content": {
               "application/json": {
                 "schema": {
@@ -3471,7 +3431,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Puts the books named at the end of a reading list, in the order they are\nnamed. A book the list already holds stays where it is. Only the owner\ncan.",
+        "summary": "Puts the books named at the end of a reading list, in the order they are\nnamed. A book the list already holds stays where it is. Only the one\nwhose list it is can.",
         "description": "Every book, group, series and list named must be on the server: one that\nis not, or a file that could not be read, refuses the request, and\nnothing is added. One request names 10,000 at most.",
         "operationId": "addToReadingList",
         "parameters": [
@@ -3517,7 +3477,7 @@
             }
           },
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The list is someone else's",
             "content": {
               "application/json": {
                 "schema": {
@@ -3543,7 +3503,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Takes a book out of a reading list. The others keep their order. Only\nthe owner can.",
+        "summary": "Takes a book out of a reading list. The others keep their order. Only\nthe one whose list it is can.",
         "operationId": "removeFromReadingList",
         "parameters": [
           {
@@ -3570,7 +3530,7 @@
         "responses": {
           "204": {},
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The list is someone else's",
             "content": {
               "application/json": {
                 "schema": {
@@ -3597,7 +3557,7 @@
         "tags": [
           "lists"
         ],
-        "summary": "Moves a book of a reading list to another position in it. The other\nbooks keep their order. Only the owner can.",
+        "summary": "Moves a book of a reading list to another position in it. The other\nbooks keep their order. Only the one whose list it is can.",
         "operationId": "moveInReadingList",
         "parameters": [
           {
@@ -3644,7 +3604,7 @@
             }
           },
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The list is someone else's",
             "content": {
               "application/json": {
                 "schema": {
@@ -3710,7 +3670,7 @@
             }
           },
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The caller is not the owner, or the list is not their own",
             "content": {
               "application/json": {
                 "schema": {
@@ -3754,7 +3714,7 @@
             "description": "The list shows its first book's cover"
           },
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The caller is not the owner, or the list is not their own",
             "content": {
               "application/json": {
                 "schema": {
@@ -3825,7 +3785,79 @@
             }
           },
           "403": {
-            "description": "The caller is not the owner",
+            "description": "The caller is not the owner, or the list is not their own",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reading-lists/{id}/sharing": {
+      "put": {
+        "tags": [
+          "lists"
+        ],
+        "summary": "Says who a reading list is shared with from now on: everyone, the\npeople named, or nobody. Only the one whose list it is can. The people\nit is shared with see it, with the books they may read, and cannot\nchange it. Someone who may read none of its books does not see it.",
+        "description": "Everyone named must be on the server: someone who is not refuses the\nrequest, and nothing changes. Naming the one whose list it is changes\nnothing.",
+        "operationId": "shareReadingList",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The reading list",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sharing"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadingList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Someone named is not on the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The list is someone else's",
             "content": {
               "application/json": {
                 "schema": {
@@ -5311,6 +5343,29 @@
         ]
       }
     },
+    "/api/v1/users/names": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Lists everyone on the server by name, the caller too, in name order:\nwhat a person needs to know of the others to share something with\nthem. It says nothing else about them.",
+        "operationId": "listUserNames",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserName"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{id}": {
       "delete": {
         "tags": [
@@ -6338,7 +6393,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "The id of the reading list that already has that name."
+            "description": "The id of the caller's reading list that already has that name."
           }
         }
       },
@@ -6972,7 +7027,7 @@
       },
       "NewCblRule": {
         "type": "object",
-        "description": "What the owner says an entry of a CBL file means.",
+        "description": "What the caller says an entry of a CBL file means.",
         "required": [
           "entry"
         ],
@@ -7091,7 +7146,7 @@
           },
           "name": {
             "type": "string",
-            "description": "At most 200 characters. No other list may have it: names that differ\nonly in capitals, accents, spaces or punctuation count as the same."
+            "description": "At most 200 characters. No other list of the caller's may have it:\nnames that differ only in capitals, accents, spaces or punctuation\ncount as the same."
           },
           "series": {
             "type": "array",
@@ -7692,14 +7747,18 @@
       },
       "ReadingList": {
         "type": "object",
-        "description": "A reading list: books in an order someone chose, across series. It\nbelongs to the server, and holds its books by their `identity`: a book\nstays in it when its file is moved or renamed, and comes back into it\nwhen a file that was gone is seen again.",
+        "description": "A reading list: books in an order someone chose, across series. It\nbelongs to the person who made it, and holds its books by their\n`identity`: a book stays in it when its file is moved or renamed, and\ncomes back into it when a file that was gone is seen again.",
         "required": [
           "id",
           "name",
           "book_count",
           "unread_count",
           "cover_chosen",
-          "covers"
+          "covers",
+          "made_by",
+          "mine",
+          "shared_with_all",
+          "shared_with"
         ],
         "properties": {
           "book_count": {
@@ -7745,8 +7804,27 @@
             "format": "int64",
             "description": "The latest year its books came out."
           },
+          "made_by": {
+            "$ref": "#/components/schemas/UserName",
+            "description": "Whose list it is: the person who made it."
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "Whether it is the caller's own. Only then can they change it, and\nsay who it is shared with."
+          },
           "name": {
             "type": "string"
+          },
+          "shared_with": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserName"
+            },
+            "description": "The people it is shared with one by one, in name order. Only the one\nwhose list it is is told: it is empty for anyone else."
+          },
+          "shared_with_all": {
+            "type": "boolean",
+            "description": "Whether everyone on the server sees it."
           },
           "summary": {
             "type": [
@@ -7770,7 +7848,7 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "At most 200 characters. No other list may have it."
+            "description": "At most 200 characters. No other list of the caller's may have it."
           },
           "summary": {
             "type": [
@@ -8300,6 +8378,25 @@
           }
         }
       },
+      "Sharing": {
+        "type": "object",
+        "description": "Who a reading list is shared with from now on. It is all of it: the\npeople left out no longer see the list.",
+        "properties": {
+          "everyone": {
+            "type": "boolean",
+            "description": "Whether everyone on the server sees it, those who join later too."
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "Ids of the people it is shared with one by one, from `GET\n/users/names`."
+          }
+        },
+        "additionalProperties": false
+      },
       "Summary": {
         "type": "object",
         "description": "What some books are about. No file describes a series or a group, so\nthese are the words of the first of the books, in reading order, that\ndescribes itself.",
@@ -8481,6 +8578,23 @@
             ],
             "format": "password",
             "description": "A new password. It ends the user's sessions; their tokens stay."
+          }
+        }
+      },
+      "UserName": {
+        "type": "object",
+        "description": "A person of the server as the others know them: by name.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
           }
         }
       },

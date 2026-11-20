@@ -167,6 +167,84 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_lists_that_were_there_become_the_owners_shared_with_everyone() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("binge.db");
+        // A server from before a list was its maker's (migration 20).
+        let options = SqliteConnectOptions::new()
+            .filename(&path)
+            .create_if_missing(true)
+            .foreign_keys(true);
+        let pool = SqlitePool::connect_with(options).await.unwrap();
+        let earlier = MIGRATOR.iter().filter(|migration| migration.version < 20);
+        let before = Migrator {
+            migrations: earlier.cloned().collect::<Vec<_>>().into(),
+            ..Migrator::DEFAULT
+        };
+        before.run(&pool).await.unwrap();
+        for statement in [
+            "INSERT INTO user (id, name, name_key, password_hash, is_owner, created_at) \
+             VALUES (7, 'Ana', 'ana', 'x', 1, 0), (8, 'Ben', 'ben', 'x', 0, 0)",
+            "INSERT INTO reading_list (id, name, name_key, summary, created_at) \
+             VALUES (1, 'One', 'one', 'About it', 5), (2, 'Two', 'two', NULL, 6), \
+             (3, 'Gone', 'gone', NULL, 7)",
+            "INSERT INTO reading_list_book (list_id, content_hash, position) \
+             VALUES (1, 'aa', 0), (1, 'bb', 4), (2, 'aa', 0)",
+            "INSERT INTO reading_list_cover (list_id, cover) VALUES (2, 'cc')",
+            "INSERT INTO cbl_rule (entry_key, content_hash) VALUES ('k', 'aa')",
+            "DELETE FROM reading_list WHERE id = 3",
+        ] {
+            sqlx::query(statement).execute(&pool).await.unwrap();
+        }
+        pool.close().await;
+
+        let db = Database::open(&path).await.unwrap();
+        let lists: Vec<(i64, i64, String, Option<String>, bool, i64)> = sqlx::query_as(
+            "SELECT id, user_id, name, summary, shared_with_all, created_at \
+             FROM reading_list ORDER BY id",
+        )
+        .fetch_all(db.pool())
+        .await
+        .unwrap();
+        assert_eq!(
+            lists,
+            [
+                (1, 7, "One".to_owned(), Some("About it".to_owned()), true, 5),
+                (2, 7, "Two".to_owned(), None, true, 6),
+            ]
+        );
+        let books: Vec<(i64, String, i64)> = sqlx::query_as(
+            "SELECT list_id, content_hash, position FROM reading_list_book \
+             ORDER BY list_id, position",
+        )
+        .fetch_all(db.pool())
+        .await
+        .unwrap();
+        let book = |list, identity: &str, position| (list, identity.to_owned(), position);
+        assert_eq!(
+            books,
+            [book(1, "aa", 0), book(1, "bb", 4), book(2, "aa", 0)]
+        );
+        let kept: (i64, String, i64, String) = sqlx::query_as(
+            "SELECT c.list_id, c.cover, r.user_id, r.entry_key \
+             FROM reading_list_cover c, cbl_rule r",
+        )
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+        assert_eq!(kept, (2, "cc".to_owned(), 7, "k".to_owned()));
+        // The id of the list that was deleted is not given out again.
+        let next: i64 = sqlx::query_scalar(
+            "INSERT INTO reading_list (user_id, name, name_key, created_at) \
+             VALUES (8, 'Two', 'two', 9) RETURNING id",
+        )
+        .fetch_one(db.pool())
+        .await
+        .unwrap();
+        assert_eq!(next, 4);
+    }
+
+    #[tokio::test]
     async fn fails_when_the_folder_is_missing() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("missing").join("binge.db");

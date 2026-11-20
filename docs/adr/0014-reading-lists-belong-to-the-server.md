@@ -2,6 +2,11 @@
 
 ## Status
 
+Superseded by [0021](0021-a-reading-list-is-its-makers-to-share.md) on
+2026-11-20: a list now belongs to the person who made it. What this record
+says of how a list holds its books and of importing a CBL file still
+stands.
+
 Accepted on 2026-11-18, proposed to the owner with the plan for step W3 and
 built the same day as routes of the HTTP API and pages of the web app. The
 MCP tools that will use the same operations are not built.

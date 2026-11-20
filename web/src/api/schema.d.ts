@@ -203,7 +203,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lists the reading lists a book is in, in name order. */
+        /**
+         * Lists the reading lists the caller sees that a book is in, in name
+         *     order.
+         */
         get: operations["listReadingListsOfBook"];
         put?: never;
         post?: never;
@@ -903,14 +906,15 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Lists the reading lists in name order. A list that holds no book the
-         *     caller may read is left out, except for the owner.
+         * Lists the reading lists the caller sees, in name order: their own, and
+         *     the ones shared with them or with everyone. A list of someone else's
+         *     that holds no book the caller may read is left out.
          */
         get: operations["listReadingLists"];
         put?: never;
         /**
-         * Makes a reading list, with the books named in it from the start. Only
-         *     the owner can.
+         * Makes a reading list of the caller's own, with the books named in it
+         *     from the start. Nobody else sees it until it is shared.
          * @description Every book, group, series and list named must be on the server: one that
          *     is not, or a file that could not be read, refuses the request, and
          *     nothing is made. A book named twice is in the list once. One request
@@ -936,14 +940,15 @@ export interface paths {
          * Reads a CBL file, the reading list format of ComicRack, and says which
          *     book of the server each of its entries means and how that was found. It
          *     makes nothing: the list is made with `POST /reading-lists`, from the
-         *     books settled on. Only the owner can.
+         *     books settled on. The books are looked for among those the caller may
+         *     read.
          * @description The request's body is the file, of 5 MB and 5,000 entries at most. An
          *     entry's series is looked for by its name, by its name with the volume,
          *     without its article, and without the words for a kind of publication,
          *     in that order, until one finds a book with the entry's number. Among
          *     several books with the number, the entry's volume and year decide. A
-         *     rule kept with `POST /reading-lists/import/rules` comes before all of
-         *     this.
+         *     rule the caller kept with `POST /reading-lists/import/rules` comes
+         *     before all of this.
          */
         post: operations["planReadingListImport"];
         delete?: never;
@@ -962,10 +967,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Keeps what the owner says an entry of a CBL file means, for the imports
-         *     from now on: which series its series is, or which book the entry is. It
-         *     takes the place of the rule kept before for the same. Only the owner
-         *     can.
+         * Keeps what the caller says an entry of a CBL file means, for their
+         *     imports from now on: which series its series is, or which book the
+         *     entry is. It takes the place of the rule they kept before for the same.
+         *     Each person has their own rules.
          */
         post: operations["keepImportRule"];
         delete?: never;
@@ -984,7 +989,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Forgets a rule kept for imports. Only the owner can. */
+        /** Forgets a rule the caller kept for their imports. */
         delete: operations["forgetImportRule"];
         options?: never;
         head?: never;
@@ -1008,14 +1013,14 @@ export interface paths {
         post?: never;
         /**
          * Deletes a reading list. Its books are not touched, nor is anyone's
-         *     progress in them. Only the owner can.
+         *     progress in them. Only the one whose list it is can.
          */
         delete: operations["deleteReadingList"];
         options?: never;
         head?: never;
         /**
          * Gives a reading list another name and summary. Its books stay. Only the
-         *     owner can.
+         *     one whose list it is can.
          */
         patch: operations["changeReadingList"];
         trace?: never;
@@ -1036,8 +1041,8 @@ export interface paths {
         put?: never;
         /**
          * Puts the books named at the end of a reading list, in the order they are
-         *     named. A book the list already holds stays where it is. Only the owner
-         *     can.
+         *     named. A book the list already holds stays where it is. Only the one
+         *     whose list it is can.
          * @description Every book, group, series and list named must be on the server: one that
          *     is not, or a file that could not be read, refuses the request, and
          *     nothing is added. One request names 10,000 at most.
@@ -1061,7 +1066,7 @@ export interface paths {
         post?: never;
         /**
          * Takes a book out of a reading list. The others keep their order. Only
-         *     the owner can.
+         *     the one whose list it is can.
          */
         delete: operations["removeFromReadingList"];
         options?: never;
@@ -1079,7 +1084,7 @@ export interface paths {
         get?: never;
         /**
          * Moves a book of a reading list to another position in it. The other
-         *     books keep their order. Only the owner can.
+         *     books keep their order. Only the one whose list it is can.
          */
         put: operations["moveInReadingList"];
         post?: never;
@@ -1128,6 +1133,31 @@ export interface paths {
          *     JPEG, PNG, WebP or GIF file of 20 MB at most. Only the owner can.
          */
         put: operations["giveReadingListCover"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading-lists/{id}/sharing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Says who a reading list is shared with from now on: everyone, the
+         *     people named, or nobody. Only the one whose list it is can. The people
+         *     it is shared with see it, with the books they may read, and cannot
+         *     change it. Someone who may read none of its books does not see it.
+         * @description Everyone named must be on the server: someone who is not refuses the
+         *     request, and nothing changes. Naming the one whose list it is changes
+         *     nothing.
+         */
+        put: operations["shareReadingList"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1621,6 +1651,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists everyone on the server by name, the caller too, in name order:
+         *     what a person needs to know of the others to share something with
+         *     them. It says nothing else about them.
+         */
+        get: operations["listUserNames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{id}": {
         parameters: {
             query?: never;
@@ -1998,7 +2049,7 @@ export interface components {
             name?: string | null;
             /**
              * Format: int64
-             * @description The id of the reading list that already has that name.
+             * @description The id of the caller's reading list that already has that name.
              */
             name_taken_by?: number | null;
         };
@@ -2336,7 +2387,7 @@ export interface components {
              */
             series_count: number;
         };
-        /** @description What the owner says an entry of a CBL file means. */
+        /** @description What the caller says an entry of a CBL file means. */
         NewCblRule: {
             /**
              * Format: int64
@@ -2395,8 +2446,9 @@ export interface components {
             /** @description Reading lists to take every book of. */
             lists?: number[];
             /**
-             * @description At most 200 characters. No other list may have it: names that differ
-             *     only in capitals, accents, spaces or punctuation count as the same.
+             * @description At most 200 characters. No other list of the caller's may have it:
+             *     names that differ only in capitals, accents, spaces or punctuation
+             *     count as the same.
              */
             name: string;
             /** @description Series to take every book of. */
@@ -2707,9 +2759,9 @@ export interface components {
         };
         /**
          * @description A reading list: books in an order someone chose, across series. It
-         *     belongs to the server, and holds its books by their `identity`: a book
-         *     stays in it when its file is moved or renamed, and comes back into it
-         *     when a file that was gone is seen again.
+         *     belongs to the person who made it, and holds its books by their
+         *     `identity`: a book stays in it when its file is moved or renamed, and
+         *     comes back into it when a file that was gone is seen again.
          */
         ReadingList: {
             /**
@@ -2741,7 +2793,21 @@ export interface components {
              * @description The latest year its books came out.
              */
             last_year?: number | null;
+            /** @description Whose list it is: the person who made it. */
+            made_by: components["schemas"]["UserName"];
+            /**
+             * @description Whether it is the caller's own. Only then can they change it, and
+             *     say who it is shared with.
+             */
+            mine: boolean;
             name: string;
+            /**
+             * @description The people it is shared with one by one, in name order. Only the one
+             *     whose list it is is told: it is empty for anyone else.
+             */
+            shared_with: components["schemas"]["UserName"][];
+            /** @description Whether everyone on the server sees it. */
+            shared_with_all: boolean;
             summary?: string | null;
             /**
              * Format: int64
@@ -2754,7 +2820,7 @@ export interface components {
          *     without a summary, the list has none.
          */
         ReadingListDetails: {
-            /** @description At most 200 characters. No other list may have it. */
+            /** @description At most 200 characters. No other list of the caller's may have it. */
             name: string;
             /** @description At most 4,000 characters. */
             summary?: string | null;
@@ -3017,6 +3083,19 @@ export interface components {
             };
         };
         /**
+         * @description Who a reading list is shared with from now on. It is all of it: the
+         *     people left out no longer see the list.
+         */
+        Sharing: {
+            /** @description Whether everyone on the server sees it, those who join later too. */
+            everyone?: boolean;
+            /**
+             * @description Ids of the people it is shared with one by one, from `GET
+             *     /users/names`.
+             */
+            people?: number[];
+        };
+        /**
          * @description What some books are about. No file describes a series or a group, so
          *     these are the words of the first of the books, in reading order, that
          *     describes itself.
@@ -3098,6 +3177,12 @@ export interface components {
              * @description A new password. It ends the user's sessions; their tokens stay.
              */
             password?: string | null;
+        };
+        /** @description A person of the server as the others know them: by name. */
+        UserName: {
+            /** Format: int64 */
+            id: number;
+            name: string;
         };
         /**
          * @description A library narrowed and ordered, kept under a name. Its series are what
@@ -5212,16 +5297,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            /** @description Another list has the name; `conflicts_with` is its id */
+            /** @description Another list of the caller's has the name; `conflicts_with` is its id */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5263,15 +5339,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
         };
     };
     keepImportRule: {
@@ -5304,15 +5371,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
         };
     };
     forgetImportRule: {
@@ -5332,15 +5390,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-            /** @description The caller is not the owner */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
             };
             404: {
                 headers: {
@@ -5400,7 +5449,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The caller is not the owner */
+            /** @description The list is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5452,7 +5501,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
+            /** @description The list is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5469,7 +5518,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description Another list has the name; `conflicts_with` is its id */
+            /** @description Another list of the caller's has the name; `conflicts_with` is its id */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5543,7 +5592,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
+            /** @description The list is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5582,7 +5631,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The caller is not the owner */
+            /** @description The list is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5635,7 +5684,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
+            /** @description The list is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5687,7 +5736,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
+            /** @description The caller is not the owner, or the list is not their own */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5726,7 +5775,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description The caller is not the owner */
+            /** @description The caller is not the owner, or the list is not their own */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5778,7 +5827,59 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            /** @description The caller is not the owner */
+            /** @description The caller is not the owner, or the list is not their own */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    shareReadingList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The reading list */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Sharing"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingList"];
+                };
+            };
+            /** @description Someone named is not on the server */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The list is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6927,6 +7028,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listUserNames: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserName"][];
                 };
             };
         };

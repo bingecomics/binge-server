@@ -216,7 +216,7 @@ async fn forget_series_cover(
     responses(
         (status = NO_CONTENT, description = "The list has the cover"),
         (status = BAD_REQUEST, description = "The page is no picture the server can read", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The caller is not the owner, or the list is not their own", body = ApiError),
         (status = NOT_FOUND, description = "No such list, no such book, or no such page", body = ApiError),
     )
 )]
@@ -241,7 +241,7 @@ async fn choose_list_cover(
     responses(
         (status = NO_CONTENT, description = "The list has the cover"),
         (status = BAD_REQUEST, description = "Not a picture the server can read, or one of more than 20 MB", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The caller is not the owner, or the list is not their own", body = ApiError),
         (status = NOT_FOUND, body = ApiError),
     )
 )]
@@ -265,7 +265,7 @@ async fn give_list_cover(
     params(("id" = i64, Path, description = "The reading list")),
     responses(
         (status = NO_CONTENT, description = "The list shows its first book's cover"),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The caller is not the owner, or the list is not their own", body = ApiError),
         (status = NOT_FOUND, body = ApiError),
     )
 )]

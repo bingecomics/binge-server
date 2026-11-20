@@ -507,9 +507,10 @@ on a page are marked unread in one go.
 
 The biggest gap: the owner reads from reading lists.
 
-Built (2026-11-18): everything below. A list belongs to the server
+Built (2026-11-18): everything below. A list belonged to the server
 ([ADR 0014](docs/adr/0014-reading-lists-belong-to-the-server.md)): the
-owner makes, imports and changes lists, and everyone reads them. The import
+owner made, imported and changed lists, and everyone read them. Step P1
+made a list its maker's. The import
 keeps nothing until the list is made: the file is read into a plan, a fix
 is kept as a rule, and the file is sent again. "Add to a reading list…" is
 in every menu and in the bar of what is picked. Also done here: a book of
@@ -708,7 +709,6 @@ side by side, direction), which stayed in the browser until W5.
   but Binge's own.
 - Ratings, reviews and recommendations from outside services.
 - Editing what a file says about itself. Binge edits the layout.
-- "Want to read" and collections, until something needs them.
 - Sending books by mail to an e-reader, notes and highlights in text
   books, and other servers as entries in the menu.
 
@@ -717,9 +717,35 @@ how series relate to each other (sequel, prequel, spin-off), which an AI
 client could fill in, and a table of contents a reader makes for a book,
 which for a collected edition is the list of the issues inside it.
 
+### Reading lists of one's own (P1)
+
+Written 2026-11-20, with the owner, who put this step before the MCP
+server. It is lettered for the same reason as the web app's steps:
+iteration 6 stays the MCP server. What is written here is what is being
+built; it grows as the parts land.
+
+#### P1. Reading lists of one's own, and sharing
+
+Built (2026-11-20): everything below
+([ADR 0021](docs/adr/0021-a-reading-list-is-its-makers-to-share.md), which
+replaces 0014).
+
+- A reading list belongs to the person who made it, and any member makes
+  one, adds to it and imports one from a CBL file. The lists that were
+  there became the owner's, shared with everyone.
+- A list is shared with the people chosen, or with everyone on the
+  server. It stands as "Only you", "Shared with Ana and Luis" or "Shared
+  with everyone", and the one it is shared with sees whose it is. Only the
+  one who made it changes it or who it is shared with, and anyone shares
+  what is theirs. On a server of one person nothing about sharing is
+  shown.
+- A list is shown without the books of libraries the person does not
+  read, and its count is of what they see.
+- What a person fixes by hand in a CBL import is kept as their own rule.
+
 ### Later, in outline only
 
-These follow the web app steps above.
+These follow the web app steps and P1 above.
 
 6. MCP server: read-only library tools, the operations that change the
    layout, page images, the current reading session.

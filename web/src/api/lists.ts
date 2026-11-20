@@ -9,6 +9,7 @@ import {
   type NewReadingList,
   type ReadingList,
   type ReadingListDetails,
+  type Sharing,
   sayProblem,
   unwrap,
 } from "./client";
@@ -22,11 +23,15 @@ function booksKey(listId: number) {
   return [...LISTS, listId, "books"];
 }
 
-/** The reading lists that hold a book the reader may read, by name. */
-export function useReadingLists() {
+/**
+ * The reading lists the reader sees, by name: their own, and the ones
+ * shared with them that hold a book they may read.
+ */
+export function useReadingLists({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: LISTS,
     queryFn: async () => unwrap(await api.GET("/api/v1/reading-lists")),
+    enabled,
   });
 }
 
@@ -61,7 +66,7 @@ export function useListsOfBook(bookId: number) {
   });
 }
 
-/** Makes a reading list, with books in it or none. Only the owner can. */
+/** Makes a reading list of the reader's own, with books in it or none. */
 export function useCreateList() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -71,7 +76,7 @@ export function useCreateList() {
   });
 }
 
-/** Gives a reading list another name and summary. Only the owner can. */
+/** Gives a reading list of the reader's another name and summary. */
 export function useChangeList(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -83,8 +88,33 @@ export function useChangeList(id: number) {
   });
 }
 
+/** Says who a reading list of the reader's is shared with from now on. */
+export function useShareList(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (sharing: Sharing) =>
+      unwrap(
+        await api.PUT("/api/v1/reading-lists/{id}/sharing", {
+          params: { path: { id } },
+          body: sharing,
+        }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: LISTS }),
+  });
+}
+
 /**
- * Deletes a reading list. Its books stay. `onDeleted` runs first and the
+ * Whether a reading list is the reader's own, by what the lists already
+ * asked for say: for a part of the page that is given only the list's id.
+ * Without an id nothing is asked.
+ */
+export function useIsOwnList(id: number | undefined): boolean {
+  const lists = useReadingLists({ enabled: id !== undefined }).data;
+  return id !== undefined && lists?.find((list) => list.id === id)?.mine === true;
+}
+
+/**
+ * Deletes a reading list of the reader's. Its books stay. `onDeleted` runs first and the
  * lists are refreshed after, so the list's page can be left before it is gone.
  */
 export function useDeleteList(onDeleted: () => unknown) {
@@ -102,7 +132,7 @@ export function useDeleteList(onDeleted: () => unknown) {
 /**
  * Adds books to the end of a reading list, leaving out the ones it holds
  * already, and says over the page how many went in: nothing where the
- * person asked shows the list. Only the owner can.
+ * person asked shows the list. Only the one whose list it is can.
  */
 export function useAddToList() {
   const queryClient = useQueryClient();
@@ -125,7 +155,7 @@ export function useAddToList() {
   });
 }
 
-/** Takes a book out of a reading list. Only the owner can. */
+/** Takes a book out of a reading list of the reader's. */
 export function useRemoveFromList(listId: number) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -143,7 +173,7 @@ export function useRemoveFromList(listId: number) {
 /**
  * Moves a book of a reading list to a position among the books shown, from
  * 0. The page shows the new order at once and the server's when it answers.
- * Only the owner can.
+ * Only the one whose list it is can.
  */
 export function useMoveInList(listId: number) {
   const queryClient = useQueryClient();
@@ -181,7 +211,7 @@ export const BIGGEST_CBL = 5;
 
 /**
  * Asks the server what a CBL file would make: for each of its entries, the
- * book it found and how. Nothing is made. Only the owner can.
+ * book it found and how. Nothing is made.
  */
 export function usePlanImport() {
   return useMutation({
@@ -195,10 +225,10 @@ export function usePlanImport() {
   });
 }
 
-/** What the owner says an entry of a CBL file is: every issue of a series, or one book. */
+/** What the reader says an entry of a CBL file is: every issue of a series, or one book. */
 export type RuleFor = { entry: CblEntry } & ({ series_id: number } | { book_id: number });
 
-/** Keeps what an entry of a CBL file means, for this import and the ones after. Only the owner can. */
+/** Keeps what an entry of a CBL file means, for this import of the reader's and the ones after. */
 export function useKeepRule() {
   return useMutation({
     mutationFn: async (rule: RuleFor) =>
@@ -206,7 +236,7 @@ export function useKeepRule() {
   });
 }
 
-/** Forgets a rule kept for the imports. Only the owner can. */
+/** Forgets a rule the reader kept for their imports. */
 export function useForgetRule() {
   return useMutation({
     mutationFn: async (id: number) =>

@@ -19,13 +19,14 @@ it, so nobody has to guess later or reopen it by accident.
 | [0011](0011-read-cbr-and-pdf-with-rust-libraries.md) | Read CBR and PDF with libraries written in Rust | Accepted |
 | [0012](0012-series-and-groups-are-a-layout-over-the-files.md) | Series and groups are a layout over the files | Accepted, amended 2026-11-17 |
 | [0013](0013-the-layout-changes-only-as-asked.md) | The layout changes only as asked | Accepted |
-| [0014](0014-reading-lists-belong-to-the-server.md) | Reading lists belong to the server | Accepted |
+| [0014](0014-reading-lists-belong-to-the-server.md) | Reading lists belong to the server | Superseded by 0021 |
 | [0015](0015-long-lists-are-read-a-part-at-a-time.md) | Long lists are read a part at a time | Accepted |
 | [0016](0016-a-person-is-the-names-they-go-by.md) | A person is the names they go by | Accepted |
 | [0017](0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name | Accepted |
 | [0018](0018-what-a-person-chooses-is-kept-as-keys-and-values.md) | What a person chooses is kept as keys and values | Accepted |
 | [0019](0019-the-server-is-under-the-agpl.md) | The server is under the AGPL | Accepted |
 | [0020](0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases | Accepted |
+| [0021](0021-a-reading-list-is-its-makers-to-share.md) | A reading list is its maker's, to share | Accepted |
 
 ## Adding one
 

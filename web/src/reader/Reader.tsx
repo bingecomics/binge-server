@@ -26,6 +26,7 @@ import {
 import { useIsOwner } from "../api/account";
 import { type Book, type Page, pageUrl } from "../api/client";
 import { useKeepPage, useKeptIn } from "../api/kept";
+import { useIsOwnList } from "../api/lists";
 import { usePageProblem, useSaveProgress } from "../api/reading";
 import { Button } from "../components/Button";
 import { PageAsCover } from "../components/CoverChoices";
@@ -213,6 +214,8 @@ export function Reader({
 }) {
   const { settings } = useReaderSettings(book.series_id);
   const owner = useIsOwner();
+  // A list someone shared keeps the cover its maker gave it.
+  const ownList = useIsOwnList(listId);
   const wide = useWideWindow();
   const paired = settings.twoPages && wide;
   const layout = useMemo(() => spreads(pages, paired), [pages, paired]);
@@ -632,7 +635,7 @@ export function Reader({
             className={barButtonClass}
             button={<ImagePlus className="size-5" aria-hidden="true" />}
           >
-            <PageAsCover book={book} pages={shown} listId={listId} />
+            <PageAsCover book={book} pages={shown} listId={ownList ? listId : undefined} />
           </Menu>
         ) : null}
         <button

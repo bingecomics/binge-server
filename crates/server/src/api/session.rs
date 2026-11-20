@@ -24,6 +24,7 @@ pub(super) fn open_routes() -> OpenApiRouter<AppState> {
 pub(super) fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(me))
+        .routes(routes!(names))
         .routes(routes!(sign_out))
 }
 
@@ -171,6 +172,37 @@ async fn sign_in(
 )]
 async fn me(State(state): State<AppState>, caller: Caller) -> Result<Json<User>, ApiError> {
     Ok(Json(state.accounts.account(caller.user.id).await?.into()))
+}
+
+/// A person of the server as the others know them: by name.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct UserName {
+    pub id: i64,
+    pub name: String,
+}
+
+impl From<binge_core::UserName> for UserName {
+    fn from(user: binge_core::UserName) -> Self {
+        Self {
+            id: user.id.0,
+            name: user.name,
+        }
+    }
+}
+
+/// Lists everyone on the server by name, the caller too, in name order:
+/// what a person needs to know of the others to share something with
+/// them. It says nothing else about them.
+#[utoipa::path(
+    get,
+    path = "/users/names",
+    tag = "account",
+    operation_id = "listUserNames",
+    responses((status = OK, body = [UserName]))
+)]
+async fn names(State(state): State<AppState>, _: Caller) -> Result<Json<Vec<UserName>>, ApiError> {
+    let names = state.accounts.names().await?;
+    Ok(Json(names.into_iter().map(UserName::from).collect()))
 }
 
 /// Ends the session the request came with, and takes its cookie back. A

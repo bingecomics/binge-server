@@ -2447,9 +2447,15 @@ async fn a_reading_list_holds_books_in_an_order_across_series() {
         ["Saga 001", "Saga two", "Patrol 001"]
     );
 
-    // A member sees a list by the books he may read, and changes nothing.
+    // Shared with everyone, a member sees it by the books he may read, and
+    // changes nothing.
     server.add_user("Ben", &[manga]).await;
     let ben = server.signed_in_as("Ben", PASSWORD).await;
+    let shared = server
+        .put(&format!("{at}/sharing"), json!({ "everyone": true }))
+        .await;
+    assert_eq!(shared.status, StatusCode::OK);
+    assert_eq!(shared.json()["shared_with_all"], true);
     assert_eq!(ben.get("/api/v1/reading-lists").await.json(), json!([]));
     assert_eq!(ben.get(&at).await.status, StatusCode::NOT_FOUND);
     assert_eq!(ben.get(&books).await.status, StatusCode::NOT_FOUND);
@@ -2460,17 +2466,21 @@ async fn a_reading_list_holds_books_in_an_order_across_series() {
     assert_eq!(bens[0]["book_count"], 1);
     assert_eq!(bens[0]["cover"], his["cover"]);
     assert_eq!(ben.names_at(&books).await, ["Manga 1"]);
+    assert_eq!(bens[0]["mine"], false);
+    assert_eq!(bens[0]["made_by"]["name"], OWNER);
     for refused in [
-        ben.post("/api/v1/reading-lists", json!({ "name": "Mine" }))
-            .await,
         ben.post(&books, json!({ "books": [his["id"]] })).await,
+        ben.delete(&format!("{books}/{}", his["id"])).await,
+        ben.put(&place_of(&his), json!({ "position": 0 })).await,
+        ben.patch(&at, json!({ "name": "Mine" })).await,
+        ben.put(&format!("{at}/sharing"), json!({})).await,
         ben.delete(&at).await,
     ] {
         assert_refused(
             &refused,
             StatusCode::FORBIDDEN,
             "forbidden",
-            "not the owner",
+            "someone else's list",
         );
     }
 
@@ -2519,6 +2529,155 @@ async fn a_reading_list_holds_books_in_an_order_across_series() {
     assert_eq!(server.delete(&at).await.status, StatusCode::NOT_FOUND);
     // The books are as they were.
     assert_eq!(server.get(&of_book(&saga_1)).await.json(), json!([]));
+}
+
+#[tokio::test]
+async fn a_reading_list_is_its_makers_until_it_is_shared() {
+    let server = server().await;
+    fixtures::write_book(&server.comics.join("Saga/Saga 001.cbz"), 2, 1);
+    let comics = server.add_library().await;
+    let manga = server.add_second_library("Manga").await;
+    let ana = server.get("/api/v1/me").await.json()["id"].clone();
+    let ben_id = server.add_user("Ben", &[comics, manga]).await;
+    let cleo_id = server.add_user("Cleo", &[manga]).await;
+    let ben = server.signed_in_as("Ben", PASSWORD).await;
+    let cleo = server.signed_in_as("Cleo", PASSWORD).await;
+    let saga = server.first_book(comics).await;
+    let lists = "/api/v1/reading-lists";
+
+    // Anyone makes a list, and it is theirs alone.
+    let new = json!({ "name": "Mine", "books": [saga["id"]] });
+    let made = ben.post(lists, new).await;
+    assert_eq!(made.status, StatusCode::CREATED);
+    let list = made.json();
+    assert_eq!(list["mine"], true);
+    assert_eq!(list["made_by"], json!({ "id": ben_id, "name": "Ben" }));
+    assert_eq!(list["shared_with_all"], false);
+    assert_eq!(list["shared_with"], json!([]));
+    let at = format!("{lists}/{}", list["id"]);
+    let books = format!("{at}/books");
+    let sharing = format!("{at}/sharing");
+    // The owner of the server is not shown it either.
+    assert_eq!(server.get(lists).await.json(), json!([]));
+    assert_eq!(server.get(&at).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(server.get(&books).await.status, StatusCode::NOT_FOUND);
+    let of_saga = format!("/api/v1/books/{}/reading-lists", saga["id"]);
+    assert_eq!(server.get(&of_saga).await.json(), json!([]));
+    let whole = json!({ "read": true, "lists": [list["id"]] });
+    let marked = server.post("/api/v1/read-marks", whole).await;
+    assert_eq!(marked.json(), json!({ "books": 0 }));
+    let found = server.get("/api/v1/search?q=mine").await.json();
+    assert_eq!(found["lists"], json!([]));
+    let copied = json!({ "name": "Copy", "lists": [list["id"]] });
+    let refused = server.post(lists, copied).await;
+    assert_refused(
+        &refused,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "a list that is not shown",
+    );
+    // A cover is the owner's to choose, for a list of the owner's.
+    let cover = json!({ "book_id": saga["id"], "page": 1 });
+    let refused = ben.put(&format!("{at}/cover"), cover.clone()).await;
+    assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "a member");
+    for hidden in [
+        server.patch(&at, json!({ "name": "Ours" })).await,
+        server.post(&books, json!({ "books": [saga["id"]] })).await,
+        server.put(&sharing, json!({ "everyone": true })).await,
+        server.delete(&at).await,
+    ] {
+        assert_refused(&hidden, StatusCode::NOT_FOUND, "not_found", "not shared");
+    }
+
+    // A name is taken among one person's lists.
+    let hers = server.post(lists, json!({ "name": "Mine" })).await;
+    assert_eq!(hers.status, StatusCode::CREATED);
+    // The cover chosen for a list is shown to those who see the list.
+    let hers = format!("{lists}/{}", hers.json()["id"]);
+    let chosen = server.put(&format!("{hers}/cover"), cover.clone()).await;
+    assert_eq!(chosen.status, StatusCode::NO_CONTENT);
+    let shown = server.get(&hers).await.json()["list"]["cover"].clone();
+    let image = format!("/api/v1/covers/{}", shown.as_str().unwrap());
+    assert_eq!(server.get(&image).await.status, StatusCode::OK);
+    assert_eq!(ben.get(&image).await.status, StatusCode::NOT_FOUND);
+    let again = ben.post(lists, json!({ "name": "mine" })).await;
+    assert_refused(&again, StatusCode::CONFLICT, "conflict", "his own name");
+    assert_eq!(again.json()["conflicts_with"], list["id"]);
+
+    // Everyone is known to everyone by name, and by nothing else.
+    assert_eq!(
+        cleo.get("/api/v1/users/names").await.json(),
+        json!([
+            { "id": ana, "name": OWNER },
+            { "id": ben_id, "name": "Ben" },
+            { "id": cleo_id, "name": "Cleo" },
+        ])
+    );
+
+    // Shared with the people chosen: they see whose it is, and not who else
+    // it was shared with.
+    let chosen = json!({ "people": [cleo_id, ana, ben_id] });
+    let shared = ben.put(&sharing, chosen).await;
+    assert_eq!(shared.status, StatusCode::OK);
+    assert_eq!(
+        shared.json()["shared_with"],
+        json!([{ "id": ana, "name": OWNER }, { "id": cleo_id, "name": "Cleo" }])
+    );
+    let seen = server.get(&at).await.json()["list"].clone();
+    assert_eq!(seen["mine"], false);
+    assert_eq!(seen["made_by"]["name"], "Ben");
+    assert_eq!(seen["shared_with"], json!([]));
+    assert_eq!(seen["book_count"], 1);
+    assert_eq!(server.get(&of_saga).await.json()[0]["id"], list["id"]);
+    let found = server.get("/api/v1/search?q=mine").await.json();
+    assert_eq!(found["lists"].as_array().unwrap().len(), 2);
+    // Seeing a list is not changing it, for the owner of the server either.
+    for refused in [
+        server.patch(&at, json!({ "name": "Ours" })).await,
+        server.post(&books, json!({ "books": [saga["id"]] })).await,
+        server.put(&sharing, json!({ "everyone": true })).await,
+        server.put(&format!("{at}/cover"), cover).await,
+        server.delete(&at).await,
+    ] {
+        assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "Ben's list");
+    }
+    // It holds no book Cleo may read, so it is not there for her yet.
+    assert_eq!(cleo.get(&at).await.status, StatusCode::NOT_FOUND);
+    let hers = cleo.first_book(manga).await;
+    let added = ben.post(&books, json!({ "books": [hers["id"]] })).await;
+    assert_eq!(added.json(), json!({ "books": 1 }));
+    assert_eq!(cleo.get(&at).await.json()["list"]["book_count"], 1);
+    assert_eq!(cleo.names_at(&books).await, ["Manga 1"]);
+
+    // Someone who is not on the server is not shared with, and nothing
+    // changes.
+    let nobody = ben.put(&sharing, json!({ "people": [9999] })).await;
+    assert_refused(
+        &nobody,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "no such person",
+    );
+    let still = ben.get(&at).await.json()["list"].clone();
+    assert_eq!(still["shared_with"].as_array().unwrap().len(), 2);
+
+    // Sharing says all of it: with everyone and nobody by name, then with
+    // nobody at all.
+    let everyone = ben.put(&sharing, json!({ "everyone": true })).await;
+    assert_eq!(everyone.json()["shared_with_all"], true);
+    assert_eq!(everyone.json()["shared_with"], json!([]));
+    assert_eq!(cleo.get(&at).await.status, StatusCode::OK);
+    assert_eq!(ben.put(&sharing, json!({})).await.status, StatusCode::OK);
+    assert_eq!(cleo.get(&at).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(server.get(&at).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(ben.get(&at).await.json()["list"]["book_count"], 2);
+
+    // A list goes with the one who made it.
+    let removed = server.delete(&format!("/api/v1/users/{ben_id}")).await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    let left = server.get(lists).await.json();
+    assert_eq!(left.as_array().unwrap().len(), 1);
+    assert_eq!(left[0]["made_by"]["name"], OWNER);
 }
 
 #[tokio::test]
@@ -2673,16 +2832,26 @@ async fn a_cbl_file_is_matched_fixed_by_hand_and_made_into_a_list() {
         let refused = server.post(rules, rule).await;
         assert_refused(&refused, StatusCode::BAD_REQUEST, "invalid_request", what);
     }
+
+    // A member imports too. What the owner said a name means is the
+    // owner's: the member's import does not go by it, the name is not taken
+    // among their lists, and they keep and forget rules of their own.
     server.add_user("Ben", &[comics]).await;
     let ben = server.signed_in_as("Ben", PASSWORD).await;
     let request = Request::post("/api/v1/reading-lists/import");
-    let refused = ben.send(request.body(Body::from(file)).unwrap()).await;
-    assert_refused(
-        &refused,
-        StatusCode::FORBIDDEN,
-        "forbidden",
-        "not the owner",
-    );
+    let planned = ben.send(request.body(Body::from(file)).unwrap()).await;
+    assert_eq!(planned.status, StatusCode::OK);
+    let planned = planned.json();
+    assert!(planned["name_taken_by"].is_null());
+    assert_eq!(planned["lines"][2]["found"], "no_series");
+    let his = json!({ "entry": planned["lines"][2]["entry"], "series_id": harbor_3["series_id"] });
+    let kept = ben.post(rules, his).await;
+    assert_eq!(kept.status, StatusCode::CREATED);
+    let his = format!("{rules}/{}", kept.json()["id"]);
+    let not_his = server.delete(&his).await;
+    assert_refused(&not_his, StatusCode::NOT_FOUND, "not_found", "Ben's rule");
+    assert_eq!(found().await["lines"][2]["how"], "rule");
+    assert_eq!(ben.delete(&his).await.status, StatusCode::NO_CONTENT);
 }
 
 /// The names of the series a path lists a part of.

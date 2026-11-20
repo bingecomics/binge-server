@@ -46,7 +46,8 @@ async function choose({ of, from }: Choice) {
 }
 
 /**
- * Gives a book, a series or a reading list the cover chosen for it. Only the owner can.
+ * Gives a book, a series or a reading list the cover chosen for it. Only the
+ * owner can, and for a reading list only one of their own.
  * Every list that shows the cover is asked for again, and what goes wrong
  * is said over the page: the menu that asked is closed by then.
  */
@@ -64,7 +65,10 @@ export function useChooseCover() {
   });
 }
 
-/** Takes back the cover chosen for a book, a series or a reading list. Only the owner can. */
+/**
+ * Takes back the cover chosen for a book, a series or a reading list. Only the
+ * owner can, and for a reading list only one of their own.
+ */
 export function useForgetCover() {
   const queryClient = useQueryClient();
   return useMutation({

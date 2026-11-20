@@ -4,13 +4,13 @@
 //! A CBL file names books by their series, volume and number, not by any
 //! file. [`Catalog::plan_cbl`] works out which book of the server each entry
 //! means and says why, and makes nothing: the list is made afterwards, from
-//! the books the owner settled on, like any other list.
+//! the books the person settled on, like any other list.
 //!
 //! An entry's series is looked for by its name, then by its name with the
 //! volume, then without its article, then without the words that say what
 //! kind of publication it is. Each of these is tried in turn until one
-//! finds the issue. What the owner fixes by hand is kept as a rule, and a
-//! rule comes before all of them the next time.
+//! finds the issue. What a person fixes by hand is kept as a rule of theirs,
+//! and a rule comes before all of them the next time they import.
 
 use std::collections::{HashMap, HashSet};
 
@@ -50,7 +50,7 @@ pub struct CblEntry {
 /// How the series of an entry was found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CblHow {
-    /// By what the owner chose for it before.
+    /// By what the person chose for it before.
     Rule,
     /// A series has exactly that name.
     Name,
@@ -239,7 +239,7 @@ fn book_rule_key(entry: &CblEntry) -> String {
     )
 }
 
-/// A rule the owner made.
+/// A rule a person made.
 #[derive(sqlx::FromRow)]
 struct Rule {
     id: i64,
@@ -290,7 +290,7 @@ fn attempts(
     rules: &HashMap<String, Rule>,
 ) -> (Vec<Attempt>, Option<GroupKind>) {
     let (plain, kind) = without_words(&entry.series);
-    // What the owner said the name means is all there is to try.
+    // What the person said the name means is all there is to try.
     let rule = rules.get(&series_rule_key(entry));
     if let Some((rule, series)) = rule.and_then(|rule| Some((rule, rule.series_id?))) {
         let attempt = Attempt {
@@ -482,10 +482,12 @@ impl Catalog {
             .fetch_all(self.db.pool())
             .await?;
         let names = Names::of(series);
-        let rules: Vec<Rule> =
-            sqlx::query_as("SELECT id, entry_key, series_id, content_hash FROM cbl_rule")
-                .fetch_all(self.db.pool())
-                .await?;
+        let rules: Vec<Rule> = sqlx::query_as(
+            "SELECT id, entry_key, series_id, content_hash FROM cbl_rule WHERE user_id = ?",
+        )
+        .bind(user)
+        .fetch_all(self.db.pool())
+        .await?;
         let rules: HashMap<String, Rule> = rules
             .into_iter()
             .map(|rule| (rule.entry_key.clone(), rule))
@@ -521,7 +523,7 @@ impl Catalog {
         let book = |id: &i64| by_id.get(id).cloned();
 
         let name_taken_by = match &cbl.name {
-            Some(name) => list_with_key(self.db.pool(), &name_key(name)).await?,
+            Some(name) => list_with_key(self.db.pool(), user, &name_key(name)).await?,
             None => None,
         };
         let lines = cbl
@@ -577,8 +579,8 @@ impl Catalog {
         Ok(by_series)
     }
 
-    /// The books that rules name and `user` may read: the id of one file of
-    /// each, by the book's identity.
+    /// The books that `user`'s rules name and they may read: the id of one
+    /// file of each, by the book's identity.
     async fn books_ruled(
         &self,
         user: UserId,
@@ -589,7 +591,8 @@ impl Catalog {
         }
         let query = format!(
             "SELECT b.content_hash, MIN(b.id) FROM book b \
-             WHERE b.content_hash IN (SELECT content_hash FROM cbl_rule) AND {} \
+             WHERE b.content_hash IN (SELECT content_hash FROM cbl_rule WHERE user_id = ?1) \
+             AND {} \
              GROUP BY b.content_hash",
             may_read("b.library_id")
         );
@@ -600,13 +603,13 @@ impl Catalog {
         Ok(found.into_iter().collect())
     }
 
-    /// Keeps what the owner says an entry of a CBL file means, for this
-    /// import and the ones after it, and returns the rule's id. It takes the
-    /// place of what was said before about the same entry, or about the same
-    /// series for a rule about a series.
+    /// Keeps what `user` says an entry of a CBL file means, for this import
+    /// of theirs and the ones after it, and returns the rule's id. It takes
+    /// the place of what they said before about the same entry, or about
+    /// the same series for a rule about a series.
     pub async fn keep_cbl_rule(
         &self,
-        owner: UserId,
+        user: UserId,
         entry: &CblEntry,
         means: CblRuleFor,
     ) -> Result<i64, CatalogError> {
@@ -623,20 +626,22 @@ impl Catalog {
         };
         let (key, series, identity) = match means {
             CblRuleFor::Series(id) => {
-                self.series(owner, id).await.map_err(missing)?;
+                self.series(user, id).await.map_err(missing)?;
                 (series_rule_key(entry), Some(id), None)
             }
             CblRuleFor::Book(id) => {
-                let book = self.book(owner, id).await.map_err(missing)?;
+                let book = self.book(user, id).await.map_err(missing)?;
                 let identity = book.content_hash.ok_or(CatalogError::Invalid(UNREADABLE))?;
                 (book_rule_key(entry), None, Some(identity))
             }
         };
         Ok(sqlx::query_scalar(
-            "INSERT INTO cbl_rule (entry_key, series_id, content_hash) VALUES (?, ?, ?) \
-             ON CONFLICT (entry_key) DO UPDATE SET series_id = excluded.series_id, \
+            "INSERT INTO cbl_rule (user_id, entry_key, series_id, content_hash) \
+             VALUES (?, ?, ?, ?) \
+             ON CONFLICT (user_id, entry_key) DO UPDATE SET series_id = excluded.series_id, \
              content_hash = excluded.content_hash RETURNING id",
         )
+        .bind(user)
         .bind(key)
         .bind(series)
         .bind(identity)
@@ -644,10 +649,11 @@ impl Catalog {
         .await?)
     }
 
-    /// Forgets a rule.
-    pub async fn forget_cbl_rule(&self, id: i64) -> Result<(), CatalogError> {
-        let forgotten = sqlx::query("DELETE FROM cbl_rule WHERE id = ?")
+    /// Forgets a rule of `user`'s.
+    pub async fn forget_cbl_rule(&self, user: UserId, id: i64) -> Result<(), CatalogError> {
+        let forgotten = sqlx::query("DELETE FROM cbl_rule WHERE id = ? AND user_id = ?")
             .bind(id)
+            .bind(user)
             .execute(self.db.pool())
             .await?;
         if forgotten.rows_affected() == 0 {

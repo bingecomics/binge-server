@@ -1,6 +1,5 @@
 import { ListPlus } from "lucide-react";
 import { useState } from "react";
-import { useIsOwner } from "../api/account";
 import { useAddToList, useCreateList, useReadingLists } from "../api/lists";
 import type { BooksToMark } from "../api/reading";
 import { books as bookCount } from "../format";
@@ -25,15 +24,8 @@ export function askToAddToList(what: BooksToMark, onAdded?: () => void) {
   asked.set({ what, onAdded });
 }
 
-/**
- * The choice of a menu that adds books to a reading list. It is the
- * owner's; nobody else has it.
- */
+/** The choice of a menu that adds books to a reading list of the reader's. */
 export function AddToListChoice({ what }: { what: BooksToMark }) {
-  const owner = useIsOwner();
-  if (!owner) {
-    return null;
-  }
   return (
     <MenuItem icon={ListPlus} onSelect={() => askToAddToList(what)}>
       Add to a reading list…
@@ -41,7 +33,11 @@ export function AddToListChoice({ what }: { what: BooksToMark }) {
   );
 }
 
-/** The reading lists to choose from, and the way to make a new one with the books in it. */
+/**
+ * The reader's own reading lists to choose from, and the way to make a new
+ * one with the books in it. A list someone shared with them is not theirs
+ * to add to.
+ */
 function Lists({ what, onAdded, onClose }: Asked & { onClose: () => void }) {
   const lists = useReadingLists();
   const add = useAddToList();
@@ -50,7 +46,7 @@ function Lists({ what, onAdded, onClose }: Asked & { onClose: () => void }) {
   const busy = add.isPending || create.isPending;
   const problem = add.error ?? create.error ?? lists.error;
   // A list is not added to itself.
-  const others = lists.data?.filter((list) => !what.lists?.includes(list.id)) ?? [];
+  const others = lists.data?.filter((list) => list.mine && !what.lists?.includes(list.id)) ?? [];
 
   function done() {
     onAdded?.();

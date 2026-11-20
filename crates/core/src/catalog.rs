@@ -53,6 +53,8 @@ pub enum CatalogError {
     /// Holds the id of the reading list that has the name.
     #[error("reading list {0} already has that name")]
     ListNameTaken(i64),
+    #[error("the reading list is someone else's")]
+    NotYours,
     /// Holds the id of the person who goes by the name.
     #[error("person {0} already goes by that name")]
     NameOfAnother(i64),
@@ -96,9 +98,10 @@ impl CatalogError {
             }
             Self::GroupExists(_) => "This series already has that group.",
             Self::ListNameTaken(_) => {
-                "Another reading list already has that name. Names that differ only in \
-                 capitals, accents, spaces or punctuation count as the same."
+                "Another of your reading lists already has that name. Names that differ \
+                 only in capitals, accents, spaces or punctuation count as the same."
             }
+            Self::NotYours => "Only the person who made a reading list can change it.",
             Self::NameOfAnother(_) => {
                 "Someone else already goes by that name. Merge the two instead."
             }

@@ -165,7 +165,7 @@ The routes today:
 | `GET /series/{id}/overview` | One series seen whole: what its books say about it together, how far the caller is through it, and the book to open next |
 | `GET /groups/{id}/overview`, `GET /groups/{id}/books` | One group of a series seen whole, as a series is: its series, what its books say about it together, how far the caller is through it, and the book to open next; its books |
 | `GET /covers/{cover}` | A cover image |
-| `PUT /books/{id}/cover`, `PUT /series/{id}/cover`, `PUT /reading-lists/{id}/cover` | The owner makes a page of a book the cover of a book; of a series; of a reading list |
+| `PUT /books/{id}/cover`, `PUT /series/{id}/cover`, `PUT /reading-lists/{id}/cover` | The owner makes a page of a book the cover of a book; of a series; of a reading list of their own |
 | `PUT /books/{id}/cover/picture`, and the same for `/series` and `/reading-lists` | The owner gives a picture as the cover: the body is the picture's file |
 | `DELETE /books/{id}/cover`, and the same for `/series` and `/reading-lists` | The owner takes the chosen cover back |
 | `GET /books/{id}` | One book, with how far it has been read |
@@ -192,14 +192,16 @@ The routes today:
 | `PATCH /people/{id}` | The owner shows a person by another of their names |
 | `POST /people/{id}/merge` | The owner makes other people one with this one |
 | `POST /people/{id}/names`, `DELETE /people/{id}/names/{name}` | The owner gives a person one more name; makes a name a person of its own again |
-| `GET /reading-lists`, `POST /reading-lists` | The reading lists the caller may see; the owner makes one, with books in it or none |
-| `GET /reading-lists/{id}`, `PATCH`, `DELETE` | One list seen whole, as a series is; the owner gives it another name and summary; deletes it |
-| `GET /reading-lists/{id}/books`, `POST` | Its books in its order; the owner adds books, groups, series or other lists at its end |
-| `DELETE /reading-lists/{id}/books/{book_id}` | The owner takes a book out of a list |
-| `PUT /reading-lists/{id}/books/{book_id}/position` | The owner moves a book of a list to a position among the books shown |
-| `GET /books/{id}/reading-lists` | The reading lists a book is in |
-| `POST /reading-lists/import` | The owner asks what a CBL file would make: the body is the file. Nothing is made |
-| `POST /reading-lists/import/rules`, `DELETE /reading-lists/import/rules/{id}` | The owner keeps what an entry of a CBL file means, for the imports from now on; forgets it |
+| `GET /reading-lists`, `POST /reading-lists` | The reading lists the caller sees: their own and the ones shared with them; anyone makes one of their own, with books in it or none |
+| `GET /reading-lists/{id}`, `PATCH`, `DELETE` | One list seen whole, as a series is; the one whose list it is gives it another name and summary; deletes it |
+| `PUT /reading-lists/{id}/sharing` | The one whose list it is says who sees it: everyone, the people named, or nobody else |
+| `GET /reading-lists/{id}/books`, `POST` | Its books in its order; the one whose list it is adds books, groups, series or other lists at its end |
+| `DELETE /reading-lists/{id}/books/{book_id}` | The one whose list it is takes a book out of it |
+| `PUT /reading-lists/{id}/books/{book_id}/position` | The one whose list it is moves a book of it to a position among the books shown |
+| `GET /books/{id}/reading-lists` | The reading lists the caller sees that a book is in |
+| `POST /reading-lists/import` | Asks what a CBL file would make: the body is the file. Nothing is made |
+| `POST /reading-lists/import/rules`, `DELETE /reading-lists/import/rules/{id}` | Keeps what the caller says an entry of a CBL file means, for their imports from now on; forgets it |
+| `GET /users/names` | Everyone on the server by name and id, for any caller: who something can be shared with |
 
 Lists that grow with the library are read a part at a time, by `offset`
 and `limit` (100 when left out, 500 at most), and answer with the `total`:
@@ -614,7 +616,7 @@ deleted, not even when its file or its library is removed, so a book that
 comes back finds its cover again. Nothing clears the covers of books that
 are gone for good yet.
 
-**Chosen covers.** The owner can give a book, a series or a reading list another cover: any
+**Chosen covers.** The owner can give a book, a series or a reading list of their own another cover: any
 page of any book, or a picture (a JPEG, PNG, WebP or GIF file of 20 MB at
 most). The server makes a cover of it as it does of a first page and keeps
 it in `covers/` in the data directory, under the hash of the cover itself,
@@ -632,7 +634,7 @@ picture that was given cannot be made again from the library.
 In the web app the choices are in the menu of a book's page and of a
 series' page ("Choose a cover…", which asks for a picture, and "Use the usual cover"), and the
 reader has a menu that makes a page on screen the cover of the book, of
-its series, or of the reading list it is read from. Only the owner sees them. In the core they are
+its series, or of the reading list it is read from when that is the owner's own. Only the owner sees them. In the core they are
 `Catalog::choose_cover` and `Catalog::forget_cover`, for a tool of the MCP
 server to call.
 
@@ -715,15 +717,26 @@ a part at a time, from the first that came out.
 ### Reading lists
 
 A reading list is a name, a summary and books of any series in an order.
-It belongs to the server: the owner makes and changes it and everyone reads
-it ([ADR 0014](adr/0014-reading-lists-belong-to-the-server.md)).
+It belongs to the person who made it: anyone makes one, only they change
+it, and they share it with the people they choose or with everyone
+([ADR 0021](adr/0021-a-reading-list-is-its-makers-to-share.md)).
 
-- **What a caller sees.** A list holds book identities, each once. A
+- **Whose it is and who sees it.** `reading_list.user_id` is the maker.
+  A caller sees their own lists, and of the others those shared with
+  everyone (`shared_with_all`) or with them (`reading_list_share`) that
+  hold a book they may read. One SQL condition, `lists::may_see`, says
+  so everywhere a list is read: the lists themselves, their books, their
+  covers, search, and marking a list as read. A list carries `made_by`,
+  `mine`, `shared_with_all` and, for its maker only, `shared_with`. A
+  change to someone else's list is refused with 403 when the caller sees
+  it and answered 404 when they do not. The owner of the server is
+  treated as anyone else here. A name is unique among one person's
+  lists.
+- **What a caller sees of it.** A list holds book identities, each once. A
   caller is shown the ones that are on the server now and in a library they
   may read, in the list's order, and every number the list carries is
   counted among those: `book_count`, `unread_count`, the years its books
-  span. A list that would show a member no book is answered 404. A book
-  the server holds twice is shown once.
+  span. A book the server holds twice is shown once.
 - **Order.** Each book has a `position`. `PUT …/position` takes a position
   among the books the caller is shown, from 0, and the server puts the book
   before the one shown there now, or after the last. Books that are not
@@ -743,7 +756,7 @@ it ([ADR 0014](adr/0014-reading-lists-belong-to-the-server.md)).
   those of its first books, four different ones at most, and none once a
   cover was chosen. The web app shows them when there are four. A chosen
   cover is shown to everyone who sees the list, whichever book its page is
-  from.
+  from. Choosing one is the owner's, for a list of their own.
 
 **Importing a CBL file** is a dry run. A CBL file is XML that names a list
 and its entries, each a series, a number, a volume and a year.
@@ -751,7 +764,7 @@ and its entries, each a series, a number, a volume and a year.
 most) and answers with a plan, a line for each entry. Nothing is made and
 nothing of the file is kept.
 
-For each entry the server looks for a series in turn by a rule the owner
+For each entry the server looks for a series in turn by a rule the caller
 kept, by the exact name, by the name with the volume ("Saga (2012)", "Saga
 v2012"), by the name without its article, and by the name without words
 such as "TPB", "HC", "Omnibus" or "Annual" and without what is in brackets.
@@ -766,7 +779,8 @@ number. Each line says what was found: the `book` and `how`, or
 with the books that fit.
 
 A miss is put right by a rule: `POST /reading-lists/import/rules` keeps,
-for the entry given, the series its name means or the book it is. Rules are
+for the entry given, the series its name means or the book it is. Each
+person has their own rules. They are
 tried first, at this import and every one after, and a line found by one
 carries its `rule_id`, so a wrong one can be forgotten. The file is then
 sent again for a new plan, and the list is made with `POST /reading-lists`
@@ -774,14 +788,20 @@ from the books the plan found, as any list is.
 
 In the web app the lists are at `/lists`, each a card with four covers as
 one, the years its books span and how many it holds, and Home has a row of
-them, the ones being read first. A list's page (`/lists/{id}`) has the
+them, the ones being read first. When other people shared lists with the
+person, the page has two parts, "Yours" and "Shared with you", and a card
+of someone else's list says whose it is. A list's page (`/lists/{id}`) has the
 header a series has and under it one row for each book: its place, cover,
-name, title, writer, penciller, date, and how far it was read. The owner
+name, title, writer, penciller, date, and how far it was read. Under the
+facts of the header the maker reads who sees the list ("Only you", "Shared
+with Ana and Luis", "Shared with everyone"), which opens the dialog that
+changes it, also in the menu as "Share…"; anyone else reads whose list it
+is. On a server of one person nothing about sharing is shown. The maker
 changes the order by dragging a row, or from a row's menu by typing a
 place, which is the way on a touch screen. "Add to a reading list…" is in
 the menu of every book, group, series and list and in the bar of what is
-picked; one dialog, mounted in the frame, asks which list or the name of a
-new one. `/lists/import` shows the plan as a table with a button on each
+picked, for everyone; one dialog, mounted in the frame, asks which of the
+person's own lists or the name of a new one. `/lists/import` shows the plan as a table with a button on each
 line to say what the entry is. A book's page says which lists it is in.
 
 ## Reading and progress
@@ -1090,9 +1110,10 @@ names. The server listens on `127.0.0.1` unless told otherwise; `--bind
   kept: book identity, page number, when), `off_up_next` (a series a user
   took off their "Up next", and when), `book_cover`, `series_cover` and
   `reading_list_cover` (the cover chosen for a book identity; for a series;
-  for a reading list), `reading_list` (a name and a summary),
-  `reading_list_book` (a book identity and its position in a list),
-  `cbl_rule` (what the owner said an entry of a CBL file means),
+  for a reading list), `reading_list` (whose it is, a name, a summary and
+  whether everyone sees it), `reading_list_share` (a person a list is
+  shared with), `reading_list_book` (a book identity and its position in
+  a list), `cbl_rule` (what a person said an entry of a CBL file means),
   `person` (someone the books name, and the name they are shown by),
   `person_name` (one way of writing a person's name),
   `book_credit` (a book names a spelling as its writer or penciller),
@@ -1176,10 +1197,11 @@ Listed here so the parts above make sense. Details are in
 | [0011](adr/0011-read-cbr-and-pdf-with-rust-libraries.md) | Read CBR and PDF with libraries written in Rust |
 | [0012](adr/0012-series-and-groups-are-a-layout-over-the-files.md) | Series and groups are a layout over the files |
 | [0013](adr/0013-the-layout-changes-only-as-asked.md) | The layout changes only as asked |
-| [0014](adr/0014-reading-lists-belong-to-the-server.md) | Reading lists belong to the server |
+| [0014](adr/0014-reading-lists-belong-to-the-server.md) | Reading lists belong to the server (superseded by 0021) |
 | [0015](adr/0015-long-lists-are-read-a-part-at-a-time.md) | Long lists are read a part at a time |
 | [0016](adr/0016-a-person-is-the-names-they-go-by.md) | A person is the names they go by |
 | [0017](adr/0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name |
 | [0018](adr/0018-what-a-person-chooses-is-kept-as-keys-and-values.md) | What a person chooses is kept as keys and values |
 | [0019](adr/0019-the-server-is-under-the-agpl.md) | The server is under the AGPL |
 | [0020](adr/0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases |
+| [0021](adr/0021-a-reading-list-is-its-makers-to-share.md) | A reading list is its maker's, to share |

@@ -1,7 +1,6 @@
 import { Link, linkOptions } from "@tanstack/react-router";
 import { ArrowUpDown, GripVertical, Info, ListX } from "lucide-react";
 import { type DragEvent, memo, useState } from "react";
-import { useIsOwner } from "../api/account";
 import type { Book } from "../api/client";
 import { useMoveInList, useRemoveFromList } from "../api/lists";
 import { called, published, titleUnder, yearOf } from "../format";
@@ -45,7 +44,7 @@ const Row = memo(function Row({
   book,
   place,
   listId,
-  owner,
+  mine,
   withWriter,
   withPenciller,
   withDate,
@@ -56,7 +55,7 @@ const Row = memo(function Row({
   /** Its place in the list, from 1. */
   place: number;
   listId: number;
-  owner: boolean;
+  mine: boolean;
   /** The columns the list has: one that no book of it fills is left out. */
   withWriter: boolean;
   withPenciller: boolean;
@@ -76,7 +75,7 @@ const Row = memo(function Row({
   });
   return (
     <>
-      {owner ? <GripVertical className={`${gripClass} text-fg-muted`} aria-hidden="true" /> : null}
+      {mine ? <GripVertical className={`${gripClass} text-fg-muted`} aria-hidden="true" /> : null}
       <span className={placeClass}>
         <span className="sr-only">Place </span>
         {place.toLocaleString()}
@@ -127,7 +126,7 @@ const Row = memo(function Row({
         </MenuLink>
         <ReadUnrecorded book={book} listId={listId} />
         <BookReadMarks book={book} />
-        {owner ? (
+        {mine ? (
           <>
             <MenuItem icon={ArrowUpDown} onSelect={() => onMove(book.id)}>
               Move to a place…
@@ -202,13 +201,20 @@ function rowOf(event: DragEvent): number | null {
 }
 
 /**
- * The books of a reading list in its order, one to a row. The owner
- * changes the order by dragging a row onto the place it is to take, or
+ * The books of a reading list in its order, one to a row. The one whose
+ * list it is (`mine`) changes the order by dragging a row onto the place it is to take, or
  * from a row's menu by typing the place, which is the way on a touch
  * screen and with the keyboard.
  */
-export function ListBooks({ listId, books }: { listId: number; books: Book[] }) {
-  const owner = useIsOwner();
+export function ListBooks({
+  listId,
+  books,
+  mine,
+}: {
+  listId: number;
+  books: Book[];
+  mine: boolean;
+}) {
   const move = useMoveInList(listId);
   const remove = useRemoveFromList(listId);
   /** The rows being dragged and dragged over, as places from 0. */
@@ -237,7 +243,7 @@ export function ListBooks({ listId, books }: { listId: number; books: Book[] }) 
         aria-hidden="true"
         className={`flex items-center gap-3 pb-2 ${navHeadingClass} ${wideOnly}`}
       >
-        {owner ? <span className={gripClass} /> : null}
+        {mine ? <span className={gripClass} /> : null}
         <span className={placeClass}>#</span>
         <span className="w-11 shrink-0" />
         <span className="min-w-0 flex-[2]">Book</span>
@@ -252,7 +258,8 @@ export function ListBooks({ listId, books }: { listId: number; books: Book[] }) 
         onDragStart={(event) => {
           const row = rowOf(event);
           const book = row === null ? undefined : books[row];
-          if (!book) {
+          // A cover can be dragged by itself, also in a list that is someone else's.
+          if (!book || !mine) {
             return;
           }
           event.dataTransfer.effectAllowed = "move";
@@ -290,16 +297,16 @@ export function ListBooks({ listId, books }: { listId: number; books: Book[] }) 
             <li
               key={book.id}
               data-row={row}
-              draggable={owner}
+              draggable={mine}
               className={`flex items-center gap-3 border-divider border-t py-2 ${mark} ${
                 dragged === row ? "opacity-50" : ""
-              } ${owner ? "[@media(hover:hover)]:cursor-grab" : ""}`}
+              } ${mine ? "[@media(hover:hover)]:cursor-grab" : ""}`}
             >
               <Row
                 book={book}
                 place={row + 1}
                 listId={listId}
-                owner={owner}
+                mine={mine}
                 withWriter={withWriter}
                 withPenciller={withPenciller}
                 withDate={withDate}

@@ -1,4 +1,4 @@
-import type { Book, Group, Library, Person } from "./api/client";
+import type { Book, Group, Library, Person, ReadingList } from "./api/client";
 
 /** "1 file", "1,240 files". */
 export function count(amount: number, one: string, many: string): string {
@@ -220,6 +220,27 @@ export function published(info: NonNullable<Book["info"]>): string | null {
     day: day ? "numeric" : undefined,
     timeZone: "UTC",
   }).format(date);
+}
+
+const namesTogether = new Intl.ListFormat("en-GB", { type: "conjunction" });
+
+/**
+ * Who sees a reading list, as its page tells the one whose list it is:
+ * "Only you", "Shared with Ana and Luis", "Shared with everyone".
+ */
+export function sharedWith(list: ReadingList): string {
+  if (list.shared_with_all) {
+    return "Shared with everyone";
+  }
+  if (list.shared_with.length === 0) {
+    return "Only you";
+  }
+  return `Shared with ${namesTogether.format(list.shared_with.map((person) => person.name))}`;
+}
+
+/** Whose a reading list is, for someone else's: "By Ana". Nothing for one's own. */
+export function madeBy(list: ReadingList): string | null {
+  return list.mine ? null : `By ${list.made_by.name}`;
 }
 
 /** The years a series ran: "1968", or "1968–1988". */

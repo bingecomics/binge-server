@@ -126,6 +126,9 @@ impl Catalog {
             }
             CoverOf::List(id) => {
                 let list = self.reading_list(user, id).await?;
+                if !list.mine {
+                    return Err(CatalogError::NotYours);
+                }
                 (Whose::List(id), list.cover, list.cover_chosen)
             }
         };

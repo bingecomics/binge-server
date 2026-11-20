@@ -9,6 +9,7 @@ import {
   unwrap,
 } from "./client";
 import { HEALTH } from "./health";
+import { CONTENTS } from "./libraries";
 
 export const ME = ["me"];
 const TOKENS = ["tokens"];
@@ -34,6 +35,30 @@ export function useMe() {
 /** Whether the person signed in is the server's owner, who manages libraries and users. */
 export function useIsOwner(): boolean {
   return useMe().data?.role === "owner";
+}
+
+/**
+ * Everyone on the server by name, the person signed in too: who something
+ * can be shared with. Under the key of the users, so it follows them as
+ * the owner adds and removes people.
+ */
+export function useUserNames({ enabled = true } = {}) {
+  return useQuery({
+    queryKey: [...USERS, "names"],
+    queryFn: async () => unwrap(await api.GET("/api/v1/users/names")),
+    enabled,
+  });
+}
+
+/**
+ * The other people on the server, by name: none on a server of one person,
+ * where there is nobody to share with, and none until the server answers.
+ * Not asked for while `enabled` is false.
+ */
+export function useOthers(options?: { enabled?: boolean }) {
+  const me = useMe().data;
+  const names = useUserNames(options).data;
+  return names?.filter((person) => person.id !== me?.id) ?? [];
 }
 
 /** Lets a user who has just signed in into the app. */
@@ -146,6 +171,11 @@ export function useRemoveUser() {
   return useMutation({
     mutationFn: async (id: number) =>
       unwrap(await api.DELETE("/api/v1/users/{id}", { params: { path: { id } } })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: USERS }),
+    // The reading lists they shared went with them.
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: USERS }),
+        queryClient.invalidateQueries({ queryKey: CONTENTS }),
+      ]),
   });
 }

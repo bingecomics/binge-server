@@ -94,6 +94,13 @@ pub struct User {
     pub created_at: i64,
 }
 
+/// A user as the others on the server know them: by name.
+#[derive(Clone, Debug, PartialEq, Eq, sqlx::FromRow)]
+pub struct UserName {
+    pub id: UserId,
+    pub name: String,
+}
+
 /// A user with the libraries they may read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Account {
@@ -526,6 +533,16 @@ impl Accounts {
             .collect())
     }
 
+    /// Everyone on the server by name, in name order: what a person needs
+    /// to know of the others to share something with them.
+    pub async fn names(&self) -> Result<Vec<UserName>, AccountError> {
+        Ok(
+            sqlx::query_as("SELECT id, name FROM user ORDER BY name COLLATE natsort, id")
+                .fetch_all(self.db.pool())
+                .await?,
+        )
+    }
+
     /// Adds a user who may read the given libraries.
     pub async fn create_user(
         &self,
@@ -575,8 +592,8 @@ impl Accounts {
         self.account(id).await
     }
 
-    /// Removes a user with their sessions, tokens and reading progress. The
-    /// owner cannot be removed.
+    /// Removes a user with their sessions, tokens, reading progress and
+    /// reading lists. The owner cannot be removed.
     pub async fn remove_user(&self, id: UserId) -> Result<(), AccountError> {
         self.not_the_owner(id).await?;
         sqlx::query("DELETE FROM user WHERE id = ?")

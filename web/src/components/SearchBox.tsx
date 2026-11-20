@@ -10,7 +10,7 @@ import {
 } from "react";
 import { coverUrl, type SearchResults } from "../api/client";
 import { useSearch } from "../api/libraries";
-import { books as bookCount, called, titleUnder, workOf, yearOf } from "../format";
+import { books as bookCount, called, madeBy, titleUnder, workOf, yearOf } from "../format";
 import { AFTER_TYPING, useSettled } from "../settled";
 import { navHeadingClass } from "./NavLink";
 
@@ -69,7 +69,8 @@ function groupsOf(found: SearchResults): { title: string; lines: Found[] }[] {
         (list): Found => ({
           key: `list ${list.id}`,
           name: list.name,
-          under: bookCount(list.book_count),
+          // Two people may each have a list of one name.
+          under: [bookCount(list.book_count), madeBy(list)].filter(Boolean).join(" · "),
           cover: list.cover ?? list.covers[0],
           icon: ListOrdered,
           link: { to: "/lists/$listId", params: { listId: list.id } },

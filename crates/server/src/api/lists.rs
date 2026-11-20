@@ -1,8 +1,9 @@
 //! Reading lists: books in an order someone chose, across series.
 //!
-//! A list belongs to the server. Everyone reads the lists, each seeing the
-//! books they may read; making and changing them is the owner's, and does
-//! exactly what was asked or is refused with the reason.
+//! A list belongs to the person who made it: anyone makes one, only they
+//! change it, and they share it with the people they choose or with
+//! everyone. Each person sees of a list the books they may read. A change
+//! does exactly what was asked or is refused with the reason.
 
 use axum::Json;
 use axum::body::Bytes;
@@ -16,9 +17,10 @@ use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use super::auth::{Caller, Owner};
+use super::auth::Caller;
 use super::browse::{Book, BooksOverview};
 use super::error::{ApiError, ErrorCode, whole};
+use super::session::UserName;
 use crate::app::AppState;
 
 pub(super) fn routes() -> OpenApiRouter<AppState> {
@@ -29,6 +31,7 @@ pub(super) fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(lists, create))
         .routes(routes!(overview, change, delete))
+        .routes(routes!(share))
         .routes(routes!(books, add_books))
         .routes(routes!(remove_book))
         .routes(routes!(move_book))
@@ -39,9 +42,9 @@ pub(super) fn routes() -> OpenApiRouter<AppState> {
 }
 
 /// A reading list: books in an order someone chose, across series. It
-/// belongs to the server, and holds its books by their `identity`: a book
-/// stays in it when its file is moved or renamed, and comes back into it
-/// when a file that was gone is seen again.
+/// belongs to the person who made it, and holds its books by their
+/// `identity`: a book stays in it when its file is moved or renamed, and
+/// comes back into it when a file that was gone is seen again.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ReadingList {
     pub id: i64,
@@ -63,6 +66,16 @@ pub struct ReadingList {
     pub first_year: Option<i64>,
     /// The latest year its books came out.
     pub last_year: Option<i64>,
+    /// Whose list it is: the person who made it.
+    pub made_by: UserName,
+    /// Whether it is the caller's own. Only then can they change it, and
+    /// say who it is shared with.
+    pub mine: bool,
+    /// Whether everyone on the server sees it.
+    pub shared_with_all: bool,
+    /// The people it is shared with one by one, in name order. Only the one
+    /// whose list it is is told: it is empty for anyone else.
+    pub shared_with: Vec<UserName>,
 }
 
 impl From<binge_core::ReadingList> for ReadingList {
@@ -78,6 +91,10 @@ impl From<binge_core::ReadingList> for ReadingList {
             covers: list.covers,
             first_year: list.first_year,
             last_year: list.last_year,
+            made_by: list.made_by.into(),
+            mine: list.mine,
+            shared_with_all: list.shared_with_all,
+            shared_with: list.shared_with.into_iter().map(UserName::from).collect(),
         }
     }
 }
@@ -126,8 +143,9 @@ impl From<BooksNamed> for binge_core::BooksToMark {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NewReadingList {
-    /// At most 200 characters. No other list may have it: names that differ
-    /// only in capitals, accents, spaces or punctuation count as the same.
+    /// At most 200 characters. No other list of the caller's may have it:
+    /// names that differ only in capitals, accents, spaces or punctuation
+    /// count as the same.
     pub name: String,
     /// At most 4,000 characters.
     pub summary: Option<String>,
@@ -152,10 +170,24 @@ pub struct NewReadingList {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ReadingListDetails {
-    /// At most 200 characters. No other list may have it.
+    /// At most 200 characters. No other list of the caller's may have it.
     pub name: String,
     /// At most 4,000 characters.
     pub summary: Option<String>,
+}
+
+/// Who a reading list is shared with from now on. It is all of it: the
+/// people left out no longer see the list.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Sharing {
+    /// Whether everyone on the server sees it, those who join later too.
+    #[serde(default)]
+    pub everyone: bool,
+    /// Ids of the people it is shared with one by one, from `GET
+    /// /users/names`.
+    #[serde(default)]
+    pub people: Vec<i64>,
 }
 
 /// What adding books to a list changed.
@@ -175,8 +207,9 @@ pub struct ListPosition {
     pub position: i64,
 }
 
-/// Lists the reading lists in name order. A list that holds no book the
-/// caller may read is left out, except for the owner.
+/// Lists the reading lists the caller sees, in name order: their own, and
+/// the ones shared with them or with everyone. A list of someone else's
+/// that holds no book the caller may read is left out.
 #[utoipa::path(
     get,
     path = "/reading-lists",
@@ -192,8 +225,8 @@ async fn lists(
     Ok(Json(lists.into_iter().map(ReadingList::from).collect()))
 }
 
-/// Makes a reading list, with the books named in it from the start. Only
-/// the owner can.
+/// Makes a reading list of the caller's own, with the books named in it
+/// from the start. Nobody else sees it until it is shared.
 ///
 /// Every book, group, series and list named must be on the server: one that
 /// is not, or a file that could not be read, refuses the request, and
@@ -208,13 +241,12 @@ async fn lists(
     responses(
         (status = CREATED, body = ReadingList),
         (status = BAD_REQUEST, description = "The name or the summary cannot be used, or something named is not on the server", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
-        (status = CONFLICT, description = "Another list has the name; `conflicts_with` is its id", body = ApiError),
+        (status = CONFLICT, description = "Another list of the caller's has the name; `conflicts_with` is its id", body = ApiError),
     )
 )]
 async fn create(
     State(state): State<AppState>,
-    Owner(owner): Owner,
+    caller: Caller,
     Json(new): Json<NewReadingList>,
 ) -> Result<(StatusCode, Json<ReadingList>), ApiError> {
     let books = binge_core::BooksToMark {
@@ -225,7 +257,7 @@ async fn create(
     };
     let list = state
         .catalog
-        .create_list(owner.id, &new.name, new.summary.as_deref(), &books)
+        .create_list(caller.user.id, &new.name, new.summary.as_deref(), &books)
         .await?;
     Ok((StatusCode::CREATED, Json(list.into())))
 }
@@ -257,7 +289,7 @@ async fn overview(
 }
 
 /// Gives a reading list another name and summary. Its books stay. Only the
-/// owner can.
+/// one whose list it is can.
 #[utoipa::path(
     patch,
     path = "/reading-lists/{id}",
@@ -268,26 +300,70 @@ async fn overview(
     responses(
         (status = OK, body = ReadingList),
         (status = BAD_REQUEST, description = "The name or the summary cannot be used", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The list is someone else's", body = ApiError),
         (status = NOT_FOUND, body = ApiError),
-        (status = CONFLICT, description = "Another list has the name; `conflicts_with` is its id", body = ApiError),
+        (status = CONFLICT, description = "Another list of the caller's has the name; `conflicts_with` is its id", body = ApiError),
     )
 )]
 async fn change(
     State(state): State<AppState>,
-    Owner(owner): Owner,
+    caller: Caller,
     Path(id): Path<i64>,
     Json(details): Json<ReadingListDetails>,
 ) -> Result<Json<ReadingList>, ApiError> {
     let list = state
         .catalog
-        .change_list(owner.id, id, &details.name, details.summary.as_deref())
+        .change_list(
+            caller.user.id,
+            id,
+            &details.name,
+            details.summary.as_deref(),
+        )
+        .await?;
+    Ok(Json(list.into()))
+}
+
+/// Says who a reading list is shared with from now on: everyone, the
+/// people named, or nobody. Only the one whose list it is can. The people
+/// it is shared with see it, with the books they may read, and cannot
+/// change it. Someone who may read none of its books does not see it.
+///
+/// Everyone named must be on the server: someone who is not refuses the
+/// request, and nothing changes. Naming the one whose list it is changes
+/// nothing.
+#[utoipa::path(
+    put,
+    path = "/reading-lists/{id}/sharing",
+    tag = "lists",
+    operation_id = "shareReadingList",
+    params(("id" = i64, Path, description = "The reading list")),
+    request_body = Sharing,
+    responses(
+        (status = OK, body = ReadingList),
+        (status = BAD_REQUEST, description = "Someone named is not on the server", body = ApiError),
+        (status = FORBIDDEN, description = "The list is someone else's", body = ApiError),
+        (status = NOT_FOUND, body = ApiError),
+    )
+)]
+async fn share(
+    State(state): State<AppState>,
+    caller: Caller,
+    Path(id): Path<i64>,
+    Json(sharing): Json<Sharing>,
+) -> Result<Json<ReadingList>, ApiError> {
+    let sharing = binge_core::Sharing {
+        everyone: sharing.everyone,
+        people: sharing.people.into_iter().map(binge_core::UserId).collect(),
+    };
+    let list = state
+        .catalog
+        .share_list(caller.user.id, id, &sharing)
         .await?;
     Ok(Json(list.into()))
 }
 
 /// Deletes a reading list. Its books are not touched, nor is anyone's
-/// progress in them. Only the owner can.
+/// progress in them. Only the one whose list it is can.
 #[utoipa::path(
     delete,
     path = "/reading-lists/{id}",
@@ -296,16 +372,16 @@ async fn change(
     params(("id" = i64, Path, description = "The reading list")),
     responses(
         (status = NO_CONTENT),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The list is someone else's", body = ApiError),
         (status = NOT_FOUND, body = ApiError),
     )
 )]
 async fn delete(
     State(state): State<AppState>,
-    _: Owner,
+    caller: Caller,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, ApiError> {
-    state.catalog.delete_list(id).await?;
+    state.catalog.delete_list(caller.user.id, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -330,8 +406,8 @@ async fn books(
 }
 
 /// Puts the books named at the end of a reading list, in the order they are
-/// named. A book the list already holds stays where it is. Only the owner
-/// can.
+/// named. A book the list already holds stays where it is. Only the one
+/// whose list it is can.
 ///
 /// Every book, group, series and list named must be on the server: one that
 /// is not, or a file that could not be read, refuses the request, and
@@ -346,25 +422,25 @@ async fn books(
     responses(
         (status = OK, body = Added),
         (status = BAD_REQUEST, description = "Something named is not on the server, or is a file that could not be read", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The list is someone else's", body = ApiError),
         (status = NOT_FOUND, body = ApiError),
     )
 )]
 async fn add_books(
     State(state): State<AppState>,
-    Owner(owner): Owner,
+    caller: Caller,
     Path(id): Path<i64>,
     Json(named): Json<BooksNamed>,
 ) -> Result<Json<Added>, ApiError> {
     let books = state
         .catalog
-        .add_to_list(owner.id, id, &named.into())
+        .add_to_list(caller.user.id, id, &named.into())
         .await?;
     Ok(Json(Added { books }))
 }
 
 /// Takes a book out of a reading list. The others keep their order. Only
-/// the owner can.
+/// the one whose list it is can.
 #[utoipa::path(
     delete,
     path = "/reading-lists/{id}/books/{book_id}",
@@ -376,24 +452,24 @@ async fn add_books(
     ),
     responses(
         (status = NO_CONTENT),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The list is someone else's", body = ApiError),
         (status = NOT_FOUND, description = "No such list or book, or the book is not in the list", body = ApiError),
     )
 )]
 async fn remove_book(
     State(state): State<AppState>,
-    Owner(owner): Owner,
+    caller: Caller,
     Path((id, book_id)): Path<(i64, i64)>,
 ) -> Result<StatusCode, ApiError> {
     state
         .catalog
-        .remove_from_list(owner.id, id, book_id)
+        .remove_from_list(caller.user.id, id, book_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// Moves a book of a reading list to another position in it. The other
-/// books keep their order. Only the owner can.
+/// books keep their order. Only the one whose list it is can.
 #[utoipa::path(
     put,
     path = "/reading-lists/{id}/books/{book_id}/position",
@@ -407,24 +483,25 @@ async fn remove_book(
     responses(
         (status = NO_CONTENT),
         (status = BAD_REQUEST, description = "The position is below 0", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = FORBIDDEN, description = "The list is someone else's", body = ApiError),
         (status = NOT_FOUND, description = "No such list or book, or the book is not in the list", body = ApiError),
     )
 )]
 async fn move_book(
     State(state): State<AppState>,
-    Owner(owner): Owner,
+    caller: Caller,
     Path((id, book_id)): Path<(i64, i64)>,
     Json(to): Json<ListPosition>,
 ) -> Result<StatusCode, ApiError> {
     state
         .catalog
-        .move_in_list(owner.id, id, book_id, to.position)
+        .move_in_list(caller.user.id, id, book_id, to.position)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Lists the reading lists a book is in, in name order.
+/// Lists the reading lists the caller sees that a book is in, in name
+/// order.
 #[utoipa::path(
     get,
     path = "/books/{id}/reading-lists",
@@ -487,7 +564,7 @@ pub enum CblFound {
 #[derive(Clone, Copy, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CblHow {
-    /// By what the owner chose for it before.
+    /// By what the caller chose for it before.
     Rule,
     /// A series has exactly that name.
     Name,
@@ -524,7 +601,7 @@ pub struct CblLine {
 pub struct CblPlan {
     /// The name the file gives the list.
     pub name: Option<String>,
-    /// The id of the reading list that already has that name.
+    /// The id of the caller's reading list that already has that name.
     pub name_taken_by: Option<i64>,
     /// The file's entries, in its order.
     pub lines: Vec<CblLine>,
@@ -572,15 +649,16 @@ impl From<binge_core::CblPlan> for CblPlan {
 /// Reads a CBL file, the reading list format of ComicRack, and says which
 /// book of the server each of its entries means and how that was found. It
 /// makes nothing: the list is made with `POST /reading-lists`, from the
-/// books settled on. Only the owner can.
+/// books settled on. The books are looked for among those the caller may
+/// read.
 ///
 /// The request's body is the file, of 5 MB and 5,000 entries at most. An
 /// entry's series is looked for by its name, by its name with the volume,
 /// without its article, and without the words for a kind of publication,
 /// in that order, until one finds a book with the entry's number. Among
 /// several books with the number, the entry's volume and year decide. A
-/// rule kept with `POST /reading-lists/import/rules` comes before all of
-/// this.
+/// rule the caller kept with `POST /reading-lists/import/rules` comes
+/// before all of this.
 #[utoipa::path(
     post,
     path = "/reading-lists/import",
@@ -590,20 +668,19 @@ impl From<binge_core::CblPlan> for CblPlan {
     responses(
         (status = OK, body = CblPlan),
         (status = BAD_REQUEST, description = "Not a CBL file the server can read, one that lists no books, or one too big", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
     )
 )]
 async fn plan_import(
     State(state): State<AppState>,
-    Owner(owner): Owner,
+    caller: Caller,
     file: Result<Bytes, BytesRejection>,
 ) -> Result<Json<CblPlan>, ApiError> {
     let file = whole(file, cbl::too_big, "file")?;
-    let plan = state.catalog.plan_cbl(owner.id, &file).await?;
+    let plan = state.catalog.plan_cbl(caller.user.id, &file).await?;
     Ok(Json(plan.into()))
 }
 
-/// What the owner says an entry of a CBL file means.
+/// What the caller says an entry of a CBL file means.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NewCblRule {
@@ -623,10 +700,10 @@ pub struct CblRule {
     pub id: i64,
 }
 
-/// Keeps what the owner says an entry of a CBL file means, for the imports
-/// from now on: which series its series is, or which book the entry is. It
-/// takes the place of the rule kept before for the same. Only the owner
-/// can.
+/// Keeps what the caller says an entry of a CBL file means, for their
+/// imports from now on: which series its series is, or which book the
+/// entry is. It takes the place of the rule they kept before for the same.
+/// Each person has their own rules.
 #[utoipa::path(
     post,
     path = "/reading-lists/import/rules",
@@ -636,12 +713,11 @@ pub struct CblRule {
     responses(
         (status = CREATED, body = CblRule),
         (status = BAD_REQUEST, description = "Neither or both of a series and a book were given, or the one given is not on the server", body = ApiError),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
     )
 )]
 async fn keep_rule(
     State(state): State<AppState>,
-    Owner(owner): Owner,
+    caller: Caller,
     Json(rule): Json<NewCblRule>,
 ) -> Result<(StatusCode, Json<CblRule>), ApiError> {
     let means = match (rule.series_id, rule.book_id) {
@@ -656,12 +732,12 @@ async fn keep_rule(
     };
     let id = state
         .catalog
-        .keep_cbl_rule(owner.id, &rule.entry.into(), means)
+        .keep_cbl_rule(caller.user.id, &rule.entry.into(), means)
         .await?;
     Ok((StatusCode::CREATED, Json(CblRule { id })))
 }
 
-/// Forgets a rule kept for imports. Only the owner can.
+/// Forgets a rule the caller kept for their imports.
 #[utoipa::path(
     delete,
     path = "/reading-lists/import/rules/{id}",
@@ -670,15 +746,14 @@ async fn keep_rule(
     params(("id" = i64, Path, description = "The rule")),
     responses(
         (status = NO_CONTENT),
-        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
         (status = NOT_FOUND, body = ApiError),
     )
 )]
 async fn forget_rule(
     State(state): State<AppState>,
-    _: Owner,
+    caller: Caller,
     Path(id): Path<i64>,
 ) -> Result<StatusCode, ApiError> {
-    state.catalog.forget_cbl_rule(id).await?;
+    state.catalog.forget_cbl_rule(caller.user.id, id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
