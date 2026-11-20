@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 use tower::ServiceExt;
 
 use super::*;
+use crate::update;
 
 struct Answer {
     status: StatusCode,
@@ -77,6 +78,7 @@ async fn new_server() -> Server {
     let state = AppState {
         accounts: Accounts::new(db.clone()).without_waits(),
         backups: binge_core::Backups::new(db.clone(), &data),
+        updates: Updates::new(db.clone(), update::Setup::nowhere(&data)),
         db,
         catalog: catalog.clone(),
         allowed_hosts: AllowedHosts::new(["nas.local".to_owned()]),
@@ -3414,6 +3416,66 @@ async fn the_owner_copies_the_database_and_schedules_it() {
         let refused = ben.call(method, at).await;
         assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "a member");
     }
+}
+
+#[tokio::test]
+async fn the_owner_looks_for_a_newer_version_and_asks_for_it() {
+    let server = server().await;
+    let library = server.add_library().await;
+    server.add_user("Ben", &[library]).await;
+    let at = "/api/v1/server/update";
+    let before = server.get(at).await.json();
+    assert_eq!(
+        before,
+        json!({
+            "version": binge_core::VERSION,
+            "looks": false,
+            "cannot": null,
+            "looked_at": null,
+            "newer": null,
+            "problem": null,
+            "not_started": null,
+            "stage": "idle",
+        })
+    );
+
+    // Nobody answers where the test server looks. That is what the look
+    // found, not a request that failed.
+    let looked = server
+        .call(Method::POST, "/api/v1/server/update/look")
+        .await;
+    assert_eq!(looked.status, StatusCode::OK);
+    let looked = looked.json();
+    assert!(looked["looked_at"].as_i64().unwrap() > 0);
+    assert!(
+        looked["problem"]
+            .as_str()
+            .unwrap()
+            .contains("could not reach")
+    );
+    assert_eq!(looked["newer"], json!(null));
+
+    let on = server.patch(at, json!({ "looks": true })).await.json();
+    assert_eq!(on["looks"], true);
+    let off = server.patch(at, json!({ "looks": false })).await.json();
+    assert_eq!(off["looks"], false);
+
+    // An update names the version a look found, and no look found one.
+    let refused = server.post(at, json!({ "version": "9.9.9" })).await;
+    assert_refused(&refused, StatusCode::CONFLICT, "conflict", "a version");
+    assert_eq!(server.get(at).await.json()["stage"], "idle");
+
+    let ben = server.signed_in_as("Ben", PASSWORD).await;
+    for (method, path) in [
+        (Method::GET, at),
+        (Method::POST, at),
+        (Method::POST, "/api/v1/server/update/look"),
+    ] {
+        let refused = ben.call(method, path).await;
+        assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "a member");
+    }
+    let refused = ben.patch(at, json!({ "looks": true })).await;
+    assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "a member");
 }
 
 #[tokio::test]

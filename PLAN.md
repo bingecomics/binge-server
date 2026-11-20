@@ -355,13 +355,39 @@ licence, and the image's health check, which is the binary asking itself
 with `binge-server health` (2026-11-19); and the builds on GitHub, which
 run the checks on every push and, on a tag, build the binaries and the
 image and publish them (2026-11-19, [docs/releasing.md](docs/releasing.md)).
-The Linux binaries need glibc 2.36 or newer, as the image has.
+The Linux binaries need glibc 2.36 or newer, as the image has. The first
+release, 0.1.0, was published on 2026-11-19 with the macOS binary signed
+and notarized.
 
-Not yet, in order: the owner's signing secrets and opening the
-repository; a first release; the update button, which needs a published
-release to update from.
+The update button (2026-11-19,
+[ADR 0020](docs/adr/0020-the-server-updates-itself-from-signed-releases.md)).
+Decided while building it:
 
-Still to decide: where the key that signs updates lives.
+- **The key that signs updates** is a secret of the repository, with a
+  copy the owner keeps. A second, spare key is built into the server too
+  and is kept by the owner only, for the day the first is lost.
+- **What is signed** is one small file per release that names the binaries
+  by their checksums, not each binary. The server checks it when it
+  fetches a version and again every time it starts one.
+- **A daily look, when the owner turns it on**, and a look whenever the
+  owner asks. The owner is told in the About page and under the server's
+  status in the side menu. The server never fetches or starts a version
+  by itself.
+- **Windows does not update itself.** A running program cannot take its
+  own place there. It says when a newer version is out.
+- **`--no-updates`** turns all of it off where the server is started.
+- **The button names the version the owner was shown.** When another came
+  out since, nothing is fetched and that one is shown.
+- **A kept version that does not start is told to the owner**, on the
+  About page, for as long as that server runs.
+- **The keys a server trusts when it starts are the installed binary's.**
+  After a lost key, releases stay signed with the spare; a new key reaches
+  a server only with a newer binary or image.
+
+Not yet, in order: opening the repository, since a server fetches
+releases without signing in; a release that carries the button; and the
+release after it, which is the first a server can be brought to with the
+button.
 
 **Done when:** the server on the NAS is brought to a new release with the
 button.
@@ -620,7 +646,8 @@ the reader.
 Built (2026-11-18): everything below but two things. The notice of a
 newer version is left out: it asks an address outside the server, there
 is no place yet where releases are published, and which account that
-place is under is the owner's to say first. And the MCP tool that makes a
+place is under is the owner's to say first; it came with the update
+button of iteration 5. And the MCP tool that makes a
 view comes with step 6: until then an AI client makes one with the
 owner's API token and `POST /views`, which is the route the tool will
 call, and that is how the step's "done when" was checked.

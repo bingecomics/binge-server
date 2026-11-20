@@ -96,12 +96,30 @@ The image sets these; change them with `environment:` in the Compose file.
 | `BINGE_BIND` | `0.0.0.0` | Listens on the container's network, which Docker publishes |
 | `BINGE_PORT` | `8686` | The port inside the container |
 | `BINGE_ALLOWED_HOSTS` | not set | Host names the server answers to, such as `nas.local`. IP addresses always work |
+| `BINGE_NO_UPDATES` | not set | Set to `true` and the server never looks for a newer version and never starts one it fetched: the image decides the version |
 
 ## Updating and removing
 
-To update, build and load the new image, then recreate the container:
-`docker compose up -d`. The data folder stays, and a new version brings its
-database up to date when it starts.
+To update, the owner opens **Settings**, **About** in the web app and
+presses **Look for a new version**, then **Update**. The server fetches
+the new version into `updates/` in the data folder, makes sure Binge
+signed it, and starts again as it. The container and the image stay as
+they are: each time the container starts, the image's server runs the
+newest version in the data folder in its place. So the version that runs
+can be newer than the image's tag; the About page says which runs.
+
+A new image works too: load it and recreate the container with
+`docker compose up -d`. When the image is newer than what the data folder
+holds, the image's version runs. Either way the data folder stays, and a
+new version brings its database up to date when it starts.
+
+Do not delete `updates/` from the data folder after an update. The
+database is then newer than the image, and the image's server cannot open
+it.
+
+If the server does not come back after an update, load an image of a
+newer version and recreate the container. An image newer than what the
+data folder holds runs in its place.
 
 To remove, `docker compose down` and delete the data folder. Nothing was
 ever written to your comics.

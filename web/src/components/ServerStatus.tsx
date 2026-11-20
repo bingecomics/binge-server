@@ -1,9 +1,17 @@
+import { Link } from "@tanstack/react-router";
+import { useIsOwner } from "../api/account";
 import { useHealth } from "../api/health";
+import { useUpdateStatus } from "../api/updates";
 import { moment } from "../format";
+import { textLinkClass } from "./text";
 
-/** The connection to the server in a line, with its version, and when it was built under it. */
+/**
+ * The connection to the server in a line, with its version, and when it was built under it. The
+ * owner is told here when a newer version is out.
+ */
 export function ServerStatus() {
   const health = useHealth();
+  const newer = useUpdateStatus(useIsOwner()).data?.newer;
 
   let dot = "bg-outline";
   let label = "Connecting…";
@@ -26,6 +34,13 @@ export function ServerStatus() {
       </p>
       {/* The version stays the same from one build to the next; this does not. */}
       {built == null ? null : <p className="pl-4">Built {moment(built)}</p>}
+      {newer ? (
+        <p className="pl-4">
+          <Link to="/settings/server" className={textLinkClass}>
+            Version {newer.version} is out
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -15,6 +15,9 @@ allow = [
     "BSD-3-Clause",
     "BSL-1.0",
     "CC0-1.0",
+    # The list of certificate authorities the server trusts when it fetches
+    # a release: data, under a permissive licence for data.
+    "CDLA-Permissive-2.0",
     "ISC",
     "MIT",
     "MIT-0",

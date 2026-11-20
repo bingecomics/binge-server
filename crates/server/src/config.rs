@@ -53,6 +53,11 @@ pub struct ServeArgs {
         value_delimiter = ','
     )]
     pub allowed_hosts: Vec<String>,
+
+    /// Never start a newer version the server fetched, and never look for
+    /// one. For a server whose version is decided where it is installed.
+    #[arg(long, env = "BINGE_NO_UPDATES")]
+    pub no_updates: bool,
 }
 
 impl ServeArgs {

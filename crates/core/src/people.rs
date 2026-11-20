@@ -220,11 +220,7 @@ impl Catalog {
     /// from what was kept of them then. It is done once: a scan credits
     /// every book it reads from then on.
     pub async fn catch_up_credits(&self) -> Result<(), CatalogError> {
-        let done: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM setting WHERE key = ?)")
-            .bind(CAUGHT_UP)
-            .fetch_one(self.db.pool())
-            .await?;
-        if done {
+        if self.db.has_mark(CAUGHT_UP).await? {
             return Ok(());
         }
         let mut tx = self.db.begin_write().await?;

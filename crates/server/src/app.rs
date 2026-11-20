@@ -7,6 +7,7 @@ use binge_core::{Accounts, Backups, Catalog, Database};
 use tower_http::trace::TraceLayer;
 
 use crate::host::AllowedHosts;
+use crate::update::Updates;
 use crate::{api, host, ui};
 
 #[derive(Clone)]
@@ -15,6 +16,7 @@ pub struct AppState {
     pub catalog: Catalog,
     pub accounts: Accounts,
     pub backups: Backups,
+    pub updates: Updates,
     pub allowed_hosts: AllowedHosts,
 }
 

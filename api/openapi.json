@@ -4707,6 +4707,172 @@
         }
       }
     },
+    "/api/v1/server/update": {
+      "get": {
+        "tags": [
+          "server"
+        ],
+        "summary": "Says where the server stands with its own updates: the version that\nruns, the newer one the last look found, and how far an update that was\nasked for is. Only the owner can ask.",
+        "operationId": "getUpdateStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "server"
+        ],
+        "summary": "Starts bringing the server to the newer version the last look found,\nand answers at once. The version is named, so that the server does not\nfetch another one that came out since. The server fetches it, makes sure\nBinge signed it, keeps it in its data directory and starts again as it;\nrequests fail for a moment then. `GET /server/update` says how far it\nis, and in `problem` why it stopped when it could not be done. Only the\nowner can.",
+        "operationId": "startUpdate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTo"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "An update is under way already, the version is not the newer one the last look found, or this server does not update itself",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "server"
+        ],
+        "summary": "Turns the daily look for a newer version on or off. Turning it on looks\nat once. A look asks GitHub, where the versions are published, and sends\nnothing but the server's version. Only the owner can.",
+        "operationId": "setUpdateLooks",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLooks"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The server was started with updates turned off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/server/update/look": {
+      "post": {
+        "tags": [
+          "server"
+        ],
+        "summary": "Looks now whether a newer version is published. The answer says what\nwas found in `newer`, or in `problem` why the server could not find out:\na look that fails is not an error of this request. Only the owner can.",
+        "operationId": "lookForUpdate",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The server was started with updates turned off",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/setup": {
       "post": {
         "tags": [
@@ -6012,6 +6178,15 @@
           }
         }
       },
+      "CannotUpdate": {
+        "type": "string",
+        "description": "Why a server does not bring itself to a newer version.",
+        "enum": [
+          "turned_off",
+          "no_build",
+          "development"
+        ]
+      },
       "CblEntry": {
         "type": "object",
         "description": "One book as a CBL file names it.",
@@ -6997,6 +7172,40 @@
           },
           "on_home": {
             "type": "boolean"
+          }
+        }
+      },
+      "NewerVersion": {
+        "type": "object",
+        "description": "A version newer than the one that runs.",
+        "required": [
+          "version",
+          "notes"
+        ],
+        "properties": {
+          "notes": {
+            "type": "string",
+            "description": "The page that says what changed in it."
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "NotUpdating": {
+        "type": "object",
+        "description": "Why a server does not bring itself to a newer version, for a program\nand for a person.",
+        "required": [
+          "why",
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "The same in a sentence for the owner."
+          },
+          "why": {
+            "$ref": "#/components/schemas/CannotUpdate"
           }
         }
       },
@@ -8111,6 +8320,105 @@
           },
           "text": {
             "type": "string"
+          }
+        }
+      },
+      "UpdateLooks": {
+        "type": "object",
+        "required": [
+          "looks"
+        ],
+        "properties": {
+          "looks": {
+            "type": "boolean",
+            "description": "Whether the server looks for a newer version by itself, once a day."
+          }
+        }
+      },
+      "UpdateStage": {
+        "type": "string",
+        "description": "Where an update asked for stands.",
+        "enum": [
+          "idle",
+          "fetching",
+          "restarting"
+        ]
+      },
+      "UpdateStatus": {
+        "type": "object",
+        "description": "Where the server stands with its own updates.",
+        "required": [
+          "version",
+          "looks",
+          "stage"
+        ],
+        "properties": {
+          "cannot": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NotUpdating",
+                "description": "Why this server does not bring itself to a newer version. Missing\nwhen it does."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "looked_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "When the server last looked, in seconds since 1970. Missing when it\nhas not looked since it started."
+          },
+          "looks": {
+            "type": "boolean",
+            "description": "Whether the server looks for a newer version by itself, once a day.\nLooking asks GitHub, so it is off until the owner turns it on."
+          },
+          "newer": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NewerVersion",
+                "description": "The newer version the last look found."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "not_started": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A newer version that is kept in the data directory and was not\nstarted when this server was, in a sentence for the owner. Missing\nwhen there is none. It stays until the server starts again."
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What went wrong the last time the server looked or tried to update,\nin a sentence for the owner."
+          },
+          "stage": {
+            "$ref": "#/components/schemas/UpdateStage"
+          },
+          "version": {
+            "type": "string",
+            "description": "The version that runs."
+          }
+        }
+      },
+      "UpdateTo": {
+        "type": "object",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "The version to bring the server to: the newer one the last look\nfound, as `newer.version` says it."
           }
         }
       },

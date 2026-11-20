@@ -1400,6 +1400,62 @@ export interface paths {
         patch: operations["scheduleDatabaseCopies"];
         trace?: never;
     };
+    "/api/v1/server/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Says where the server stands with its own updates: the version that
+         *     runs, the newer one the last look found, and how far an update that was
+         *     asked for is. Only the owner can ask.
+         */
+        get: operations["getUpdateStatus"];
+        put?: never;
+        /**
+         * Starts bringing the server to the newer version the last look found,
+         *     and answers at once. The version is named, so that the server does not
+         *     fetch another one that came out since. The server fetches it, makes sure
+         *     Binge signed it, keeps it in its data directory and starts again as it;
+         *     requests fail for a moment then. `GET /server/update` says how far it
+         *     is, and in `problem` why it stopped when it could not be done. Only the
+         *     owner can.
+         */
+        post: operations["startUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Turns the daily look for a newer version on or off. Turning it on looks
+         *     at once. A look asks GitHub, where the versions are published, and sends
+         *     nothing but the server's version. Only the owner can.
+         */
+        patch: operations["setUpdateLooks"];
+        trace?: never;
+    };
+    "/api/v1/server/update/look": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Looks now whether a newer version is published. The answer says what
+         *     was found in `newer`, or in `problem` why the server could not find out:
+         *     a look that fails is not an error of this request. Only the owner can.
+         */
+        post: operations["lookForUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/setup": {
         parameters: {
             query?: never;
@@ -1881,6 +1937,11 @@ export interface components {
              */
             writers: components["schemas"]["Credit"][];
         };
+        /**
+         * @description Why a server does not bring itself to a newer version.
+         * @enum {string}
+         */
+        CannotUpdate: "turned_off" | "no_build" | "development";
         /** @description One book as a CBL file names it. */
         CblEntry: {
             /** @description The issue's number, as the file writes it. */
@@ -2367,6 +2428,21 @@ export interface components {
             library_id: number;
             name: string;
             on_home?: boolean;
+        };
+        /** @description A version newer than the one that runs. */
+        NewerVersion: {
+            /** @description The page that says what changed in it. */
+            notes: string;
+            version: string;
+        };
+        /**
+         * @description Why a server does not bring itself to a newer version, for a program
+         *     and for a person.
+         */
+        NotUpdating: {
+            /** @description The same in a sentence for the owner. */
+            message: string;
+            why: components["schemas"]["CannotUpdate"];
         };
         /** @description One page of a book. */
         Page: {
@@ -2948,6 +3024,52 @@ export interface components {
         Summary: {
             book?: components["schemas"]["Book"] | null;
             text: string;
+        };
+        UpdateLooks: {
+            /** @description Whether the server looks for a newer version by itself, once a day. */
+            looks: boolean;
+        };
+        /**
+         * @description Where an update asked for stands.
+         * @enum {string}
+         */
+        UpdateStage: "idle" | "fetching" | "restarting";
+        /** @description Where the server stands with its own updates. */
+        UpdateStatus: {
+            cannot?: components["schemas"]["NotUpdating"] | null;
+            /**
+             * Format: int64
+             * @description When the server last looked, in seconds since 1970. Missing when it
+             *     has not looked since it started.
+             */
+            looked_at?: number | null;
+            /**
+             * @description Whether the server looks for a newer version by itself, once a day.
+             *     Looking asks GitHub, so it is off until the owner turns it on.
+             */
+            looks: boolean;
+            newer?: components["schemas"]["NewerVersion"] | null;
+            /**
+             * @description A newer version that is kept in the data directory and was not
+             *     started when this server was, in a sentence for the owner. Missing
+             *     when there is none. It stays until the server starts again.
+             */
+            not_started?: string | null;
+            /**
+             * @description What went wrong the last time the server looked or tried to update,
+             *     in a sentence for the owner.
+             */
+            problem?: string | null;
+            stage: components["schemas"]["UpdateStage"];
+            /** @description The version that runs. */
+            version: string;
+        };
+        UpdateTo: {
+            /**
+             * @description The version to bring the server to: the newer one the last look
+             *     found, as `newer.version` says it.
+             */
+            version: string;
         };
         /** @description A person who may use the server. */
         User: {
@@ -6311,6 +6433,153 @@ export interface operations {
             };
             /** @description The caller is not the owner */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getUpdateStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateStatus"];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    startUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTo"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateStatus"];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description An update is under way already, the version is not the newer one the last look found, or this server does not update itself */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    setUpdateLooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateLooks"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateStatus"];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The server was started with updates turned off */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    lookForUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UpdateStatus"];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The server was started with updates turned off */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

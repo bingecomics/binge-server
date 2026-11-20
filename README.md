@@ -36,6 +36,7 @@ password: that account is the owner, who adds libraries and other users.
 | `--bind` | `BINGE_BIND` | `127.0.0.1` | Address to listen on |
 | `--port` | `BINGE_PORT` | `8686` | Port to listen on |
 | `--allowed-host` | `BINGE_ALLOWED_HOSTS` | None | Extra host name the server answers to, such as `nas.local`. Repeat it, or separate names with commas |
+| `--no-updates` | `BINGE_NO_UPDATES` | Off | Never look for a newer version and never start one the server fetched |
 
 The server listens to this machine only. To read from other devices at
 home, make the owner first, then start it with `--bind 0.0.0.0` and open
@@ -67,6 +68,21 @@ server's data goes to a folder you choose.
 with 0 when it is well. Give it the same `--bind` and `--port`, or the
 same environment, as the server. The Docker image uses it as its health
 check.
+
+### Updating
+
+The owner updates the server from **Settings**, **About**: **Look for a
+new version**, then **Update**. The server fetches the release from
+GitHub, makes sure Binge signed it, keeps it in `updates/` in its data
+directory and starts again as it. It works the same in Docker. A server
+only looks when the owner asks, or once a day when the owner turns that
+on, and what it sends is its own version.
+
+The binary that was installed stays as it is: each time it starts, it
+runs the newest version in the data directory in its place. Leave
+`updates/` where it is. On Windows the page says when a new version is out
+and the download is by hand. See
+[ADR 0020](docs/adr/0020-the-server-updates-itself-from-signed-releases.md).
 
 ## Develop
 

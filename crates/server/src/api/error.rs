@@ -11,6 +11,8 @@ use binge_core::{AccountError, BackupError, CatalogError};
 use serde::Serialize;
 use utoipa::ToSchema;
 
+use crate::update::UpdateError;
+
 /// What went wrong, as an identifier clients can branch on.
 #[derive(Clone, Copy, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -256,5 +258,18 @@ impl From<BackupError> for ApiError {
     fn from(error: BackupError) -> Self {
         // Nothing the caller sent decides whether a copy can be written.
         Self::of_core(None, &error, error.for_people())
+    }
+}
+
+impl From<UpdateError> for ApiError {
+    fn from(error: UpdateError) -> Self {
+        let code = match &error {
+            // The request is fine; where the server stands is in its way.
+            UpdateError::Cannot(_) | UpdateError::Busy | UpdateError::NotTheNewest => {
+                Some(ErrorCode::Conflict)
+            }
+            _ => None,
+        };
+        Self::of_core(code, &error, error.for_people())
     }
 }

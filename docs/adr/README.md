@@ -25,6 +25,7 @@ it, so nobody has to guess later or reopen it by accident.
 | [0017](0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name | Accepted |
 | [0018](0018-what-a-person-chooses-is-kept-as-keys-and-values.md) | What a person chooses is kept as keys and values | Accepted |
 | [0019](0019-the-server-is-under-the-agpl.md) | The server is under the AGPL | Accepted |
+| [0020](0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases | Accepted |
 
 ## Adding one
 

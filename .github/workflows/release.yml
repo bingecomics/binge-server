@@ -18,11 +18,14 @@ on:
       - .dockerignore
       - .gitattributes
       - Dockerfile
+      - crates/server/update-keys/**
       - rust-toolchain.toml
       - scripts/build-mark.sh
       - scripts/package.sh
       - scripts/sign-macos.sh
+      - scripts/sign-update.sh
       - scripts/smoke.sh
+      - scripts/update-manifest.sh
   workflow_dispatch:
 
 permissions:
@@ -55,6 +58,39 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Finding one missing here costs a minute. Finding it at the step
+      # that needs it costs every build, and an image that is pushed
+      # already.
+      - name: Make sure the secrets of a release are set, for a tag
+        if: github.ref_type == 'tag'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_ISSUER }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          missing=""
+          for name in MACOS_CERTIFICATE MACOS_CERTIFICATE_PASSWORD MACOS_NOTARY_KEY \
+            MACOS_NOTARY_KEY_ID MACOS_NOTARY_ISSUER UPDATE_SIGNING_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The secret $name is not set. See docs/releasing.md."
+              missing=yes
+            fi
+          done
+          test -z "$missing"
+      # A key that is set and is not the one servers trust is found here
+      # too: the script refuses a signature the built-in key does not accept.
+      - name: Make sure the update key is the one servers trust, for a tag
+        if: github.ref_type == 'tag'
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends minisign
+          echo "signed to try the key" >"$RUNNER_TEMP/try"
+          scripts/sign-update.sh "$RUNNER_TEMP/try"
       # One mark for every platform, so that all the files of a release say
       # the same commit and time.
       - id: say
@@ -255,10 +291,15 @@ jobs:
 
   files:
     name: The files of the release
-    needs: [linux, macos, windows]
+    needs: [mark, linux, macos, windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      VERSION: ${{ needs.mark.outputs.version }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: release-*
@@ -269,7 +310,24 @@ jobs:
         run: |
           sha256sum binge-server-* >SHA256SUMS
           cat SHA256SUMS
-          ls -l
+
+      # What a running server updates itself by: the file that names the
+      # builds, and the signature that makes a server trust it.
+      - name: Name the builds a server updates itself to
+        run: scripts/update-manifest.sh "$VERSION" files
+      - name: Install minisign
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends minisign
+      - name: Sign that file, for a tag
+        if: github.ref_type == 'tag'
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: scripts/sign-update.sh files/update.json
+      - name: Try signing it, otherwise
+        if: github.ref_type != 'tag'
+        run: scripts/sign-update.sh --try files/update.json
+      - run: ls -l files
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: files

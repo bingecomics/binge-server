@@ -96,25 +96,12 @@ impl Backups {
 
     /// Whether a copy is made every day.
     pub async fn scheduled(&self) -> Result<bool, BackupError> {
-        let off: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM setting WHERE key = ?)")
-            .bind(OFF)
-            .fetch_one(self.db.pool())
-            .await?;
-        Ok(!off)
+        Ok(!self.db.has_mark(OFF).await?)
     }
 
     /// Turns the daily copy on or off. The copies there are stay.
     pub async fn schedule(&self, on: bool) -> Result<(), BackupError> {
-        let change = if on {
-            "DELETE FROM setting WHERE key = ?"
-        } else {
-            "INSERT OR IGNORE INTO setting (key, value) VALUES (?, '1')"
-        };
-        sqlx::query(change)
-            .bind(OFF)
-            .execute(self.db.pool())
-            .await?;
-        Ok(())
+        Ok(self.db.set_mark(OFF, !on).await?)
     }
 
     /// Makes a copy now, and removes the ones too old to keep.

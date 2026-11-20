@@ -13,13 +13,20 @@ axum-extra = { version = "0.12.6", features = ["query"] }
 binge-core = { path = "../core" }
 clap = { version = "4.6.7", features = ["derive", "env"] }
 directories = "6.0.0"
+flate2 = "1.1.11"
+hex = "0.4.3"
+minisign-verify = "0.3.0"
 rust-embed = { version = "8.14.0", features = ["interpolate-folder-path", "mime-guess"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+sha2 = "0.11.1"
+tar = { version = "0.4.46", default-features = false }
+thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal", "net", "fs"] }
 tower-http = { version = "0.7.1", features = ["trace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+ureq = { version = "3.5.2", default-features = false, features = ["rustls"] }
 utoipa = "6.0.0"
 utoipa-axum = "0.3.0"
 
@@ -29,5 +36,6 @@ workspace = true
 [dev-dependencies]
 binge-core = { path = "../core", features = ["fixtures"] }
 http-body-util = "0.1.5"
+minisign = "0.10.0"
 tempfile = "3.27.0"
 tower = { version = "0.5.3", features = ["util"] }

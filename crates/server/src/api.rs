@@ -17,6 +17,7 @@ mod reading;
 mod scans;
 mod session;
 mod settings;
+mod updates;
 mod users;
 mod views;
 
@@ -111,6 +112,7 @@ fn guarded() -> OpenApiRouter<AppState> {
         .merge(kept::routes())
         .merge(scans::routes())
         .merge(backups::routes())
+        .merge(updates::routes())
 }
 
 /// What takes a session: managing accounts is not for tokens.

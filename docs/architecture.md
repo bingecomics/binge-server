@@ -44,7 +44,7 @@ iteration 6 will be a third crate on top of the same core, next to
 
 | Module | Role |
 | --- | --- |
-| `main.rs` | Reads the configuration, opens the database, listens, copies the database when a copy is due, shuts down on a signal |
+| `main.rs` | Reads the configuration, hands over to a newer version kept in the data directory when there is one, opens the database, listens, copies the database when a copy is due, shuts down on a signal or to start again as a newer version |
 | `config.rs` | Command-line options and their environment variables |
 | `app.rs` | Puts the application together: API, UI, Host check, request tracing |
 | `api.rs` | Mounts the routes under `/api` and builds the OpenAPI description |
@@ -56,6 +56,12 @@ iteration 6 will be a third crate on top of the same core, next to
 | `api/history.rs` | The routes for what the caller read, and for the owner to see who reads now |
 | `api/kept.rs` | The routes for the pages the caller kept while reading |
 | `api/scans.rs`, `api/backups.rs` | The owner's routes for what scans changed and files set aside, and for the copies of the database |
+| `api/updates.rs` | The owner's routes for the server's own updates |
+| `update.rs` | The server's own updates: looking for a newer version, fetching it, and asking for the start that runs it |
+| `update/release.rs` | What a release says of itself, and the check that one of the keys built in signed it |
+| `update/store.rs` | The versions kept in `updates/` in the data directory, each proven again before it is started |
+| `update/fetch.rs` | The requests to where releases are published: the only place the server calls out |
+| `update/handover.rs` | Starting another binary of the server in the place of the one that runs |
 | `api/layout.rs` | The owner's routes that change series, groups and where books sit |
 | `api/session.rs`, `api/account.rs`, `api/users.rs` | The routes for setup and signing in, for one's own password and tokens, and for the owner to manage users |
 | `host.rs` | Refuses requests addressed to a host name the server does not know |
@@ -177,6 +183,7 @@ The routes today:
 | `GET /me/settings` | Everything the caller chose in an app, by key |
 | `PUT /me/settings/{key}`, `DELETE` | Keep a value under a key; forget it |
 | `GET /server/backups`, `POST`, `PATCH` | For the owner: the copies of the database and whether one is made every day; make one now; turn the daily copy on or off |
+| `GET /server/update`, `PATCH`, `POST`, `POST /server/update/look` | For the owner: the version that runs, the newer one the last look found and how far an update is; turn the daily look on or off; bring the server to the newer version, named in the request; look now |
 | `GET /search?q=` | The series, books, reading lists and people that hold every word of `q` |
 | `GET /people` | A part of the people the books name, the ones most books name first; with `q`, those a name of whom holds its words |
 | `GET /people/{id}` | One person the books name, with every name they go by |
@@ -1019,6 +1026,38 @@ the ones the image runs. The same builds run without publishing on a pull
 request that changes them, and every push runs `scripts/check.sh` and a
 check of the licences of what ships. See [releasing.md](releasing.md).
 
+**Updating.** The owner brings the server to a newer release from the
+About page ([ADR 0020](adr/0020-the-server-updates-itself-from-signed-releases.md)).
+The parts, in `crates/server/src/update`:
+
+1. *Looking.* The server fetches `update.json` and its signature from the
+   latest release on GitHub and reads the version in it. It does this when
+   the owner asks, and once a day while the owner has that on. It is off
+   at first: this is the only request the server makes to the outside.
+2. *Fetching.* The button names the version the owner was shown. When
+   another came out since, nothing is fetched and that one is shown.
+   Otherwise the server fetches the archive the file names for its system, compares its checksum, takes the binary out,
+   compares that checksum too, and runs it with `--version` to make sure
+   it starts here. Then it keeps the binary with the file and the
+   signature in `updates/<version>/` in the data directory.
+3. *Starting again.* The server stops taking requests, gives the ones
+   under way ten seconds, closes the database, and starts the installed
+   binary again in its own process.
+4. *Handing over.* A server that starts looks in `updates/` before it
+   opens anything. For the newest version there that is newer than itself
+   it checks the signature and the binary's checksum again, and runs that
+   binary in its own place, with the options it was started with. So the
+   process whoever started the server knows (Docker, a service, a
+   terminal) stays the same one. A version that is not proven is passed
+   over with a warning, and the owner is told that a newer version is kept
+   and was not started (`not_started`). Versions the running one has
+   caught up with are removed.
+
+`GET /server/update` says where all this stands, and the web app follows
+an update with it until another version answers, then loads itself again:
+the web app is part of the binary. Windows servers and builds for
+development look but do not fetch, and `--no-updates` turns all of it off.
+
 **Development.** `scripts/dev.sh` runs the server and Vite together. The
 browser talks to Vite, which reloads on changes and forwards `/api` to the
 server.
@@ -1110,11 +1149,6 @@ What it does not do:
 Listed here so the parts above make sense. Details are in
 [PLAN.md](../PLAN.md).
 
-- **Updating from the web app (5).** A button for the owner that brings
-  the server to the newest release.
-- **A notice of a newer version (W6).** It asks an address outside the
-  server, so it waits for a place where releases are published and stays
-  off until the owner turns it on.
 - **AI features (6 and later).** The server does no inference. It stores the
   files and the results, breaks the work into small steps, and exposes those
   steps as MCP tools. The user's own AI client does the reading and
@@ -1148,3 +1182,4 @@ Listed here so the parts above make sense. Details are in
 | [0017](adr/0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name |
 | [0018](adr/0018-what-a-person-chooses-is-kept-as-keys-and-values.md) | What a person chooses is kept as keys and values |
 | [0019](adr/0019-the-server-is-under-the-agpl.md) | The server is under the AGPL |
+| [0020](adr/0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases |

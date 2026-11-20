@@ -16,6 +16,8 @@ pub enum DbError {
     Open(#[from] sqlx::Error),
     #[error("could not migrate the database: {0}")]
     Migrate(#[from] sqlx::migrate::MigrateError),
+    #[error("the database failed: {0}")]
+    Failed(#[source] sqlx::Error),
 }
 
 /// Handle to the database. Cheap to clone; clones share one connection pool.
@@ -54,6 +56,43 @@ impl Database {
     /// two libraries scanned together do to each other.
     pub(crate) async fn begin_write(&self) -> Result<Transaction<'static, Sqlite>, sqlx::Error> {
         self.pool.begin_with("BEGIN IMMEDIATE").await
+    }
+
+    /// Whether the server keeps a mark under `key`: a yes of its own that
+    /// it remembers from one run to the next, such as a schedule turned on.
+    pub async fn is_marked(&self, key: &str) -> Result<bool, DbError> {
+        self.has_mark(key).await.map_err(DbError::Failed)
+    }
+
+    /// Keeps the mark under `key`, or removes it.
+    pub async fn mark(&self, key: &str, on: bool) -> Result<(), DbError> {
+        self.set_mark(key, on).await.map_err(DbError::Failed)
+    }
+
+    /// [`Database::is_marked`], for this crate, whose errors hold the
+    /// database's own.
+    pub(crate) async fn has_mark(&self, key: &str) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM setting WHERE key = ?)")
+            .bind(key)
+            .fetch_one(&self.pool)
+            .await
+    }
+
+    /// [`Database::mark`], for this crate.
+    pub(crate) async fn set_mark(&self, key: &str, on: bool) -> Result<(), sqlx::Error> {
+        let change = if on {
+            "INSERT OR IGNORE INTO setting (key, value) VALUES (?, '1')"
+        } else {
+            "DELETE FROM setting WHERE key = ?"
+        };
+        sqlx::query(change).bind(key).execute(&self.pool).await?;
+        Ok(())
+    }
+
+    /// Closes the database once what is under way in it has ended, so that
+    /// its file is whole before another process opens it.
+    pub async fn close(&self) {
+        self.pool.close().await;
     }
 
     /// Whether the database answers a trivial query right now.
