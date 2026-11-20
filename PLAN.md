@@ -387,8 +387,8 @@ Decided while building it:
 The repository was opened on 2026-11-19, since a server fetches releases
 without signing in. Release 0.2.0 is the first that carries the button.
 
-Not yet: the release after it, which is the first a server can be brought
-to with the button.
+Release 0.2.1 changes nothing but the number: it is the first a server can
+be brought to with the button.
 
 **Done when:** the server on the NAS is brought to a new release with the
 button.
