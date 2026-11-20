@@ -717,7 +717,7 @@ how series relate to each other (sequel, prequel, spin-off), which an AI
 client could fill in, and a table of contents a reader makes for a book,
 which for a collected edition is the list of the issues inside it.
 
-### Reading lists of one's own (P1)
+### Lists and collections of one's own (P1)
 
 Written 2026-11-20, with the owner, who put this step before the MCP
 server. It is lettered for the same reason as the web app's steps:
@@ -742,6 +742,21 @@ replaces 0014).
 - A list is shown without the books of libraries the person does not
   read, and its count is of what they see.
 - What a person fixes by hand in a CBL import is kept as their own rule.
+
+#### P1. Collections
+
+Built (2026-11-20): everything below
+([ADR 0022](docs/adr/0022-a-collection-holds-series-and-is-shared-as-a-list-is.md)).
+
+- A collection is a name, a summary and series picked by hand from any
+  library, shown by name. It belongs to the person who made it and is
+  shared as a reading list is.
+- It holds the record of each series: a series stays in it under another
+  name and leaves it when it is deleted.
+- "Add to a collection…" is in the menu of a series and in the bar of what
+  is picked while only series are picked.
+- Search finds a collection by its name. A series' page says which
+  collections it is in and which reading lists hold a book of it.
 
 ### Later, in outline only
 

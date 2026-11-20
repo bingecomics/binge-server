@@ -705,6 +705,479 @@
         }
       }
     },
+    "/api/v1/collections": {
+      "get": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Lists the collections the caller sees, in name order: their own, and the\nones shared with them or with everyone. A collection of someone else's\nthat holds no series the caller may read is left out.",
+        "operationId": "listCollections",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Collection"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Makes a collection of the caller's own, with the series named in it from\nthe start. Nobody else sees it until it is shared.",
+        "description": "Every series named must be on the server: one that is not refuses the\nrequest, and nothing is made. A series named twice is in the collection\nonce. One request names 10,000 at most.",
+        "operationId": "createCollection",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewCollection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The name or the summary cannot be used, or a series named is not on the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another collection of the caller's has the name; `conflicts_with` is its id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{id}": {
+      "get": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Returns one collection.",
+        "operationId": "getCollection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Deletes a collection. Its series are not touched. Only the one whose\ncollection it is can.",
+        "operationId": "deleteCollection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "403": {
+            "description": "The collection is someone else's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Gives a collection another name and summary. Its series stay. Only the\none whose collection it is can.",
+        "operationId": "changeCollection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollectionDetails"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The name or the summary cannot be used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The collection is someone else's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another collection of the caller's has the name; `conflicts_with` is its id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{id}/series": {
+      "get": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Lists the series of a collection the caller may read, in name order.",
+        "operationId": "listCollectionSeries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Series"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Puts the series named in a collection. A series it already holds stays.\nOnly the one whose collection it is can.",
+        "description": "Every series named must be on the server: one that is not refuses the\nrequest, and nothing is added. One request names 10,000 at most.",
+        "operationId": "addToCollection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeriesNamed"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesAdded"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A series named is not on the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The collection is someone else's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{id}/series/{series_id}": {
+      "delete": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Takes a series out of a collection. Only the one whose collection it is\ncan.",
+        "operationId": "removeFromCollection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "series_id",
+            "in": "path",
+            "description": "The series",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {},
+          "403": {
+            "description": "The collection is someone else's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such collection, or the series is not in it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/collections/{id}/sharing": {
+      "put": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Says who a collection is shared with from now on: everyone, the people\nnamed, or nobody. Only the one whose collection it is can. The people it\nis shared with see it, with the series they may read, and cannot change\nit. Someone who may read none of its series does not see it.",
+        "description": "Everyone named must be on the server: someone who is not refuses the\nrequest, and nothing changes. Naming the one whose collection it is\nchanges nothing.",
+        "operationId": "shareCollection",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Sharing"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Someone named is not on the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The collection is someone else's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/continue-reading": {
       "get": {
         "tags": [
@@ -4079,7 +4552,7 @@
         "tags": [
           "browse"
         ],
-        "summary": "Searches what the caller may read. Finds the series, books, reading\nlists and people that hold every word of `q`, anywhere in a word, and\nanswers with at most `limit` of each, saying when there are more. A\nsearch with no words finds nothing.",
+        "summary": "Searches what the caller may read. Finds the series, books, reading\nlists, collections and people that hold every word of `q`, anywhere in a word, and\nanswers with at most `limit` of each, saying when there are more. A\nsearch with no words finds nothing.",
         "operationId": "search",
         "parameters": [
           {
@@ -4314,6 +4787,50 @@
                   "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/Book"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/series/{id}/collections": {
+      "get": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Lists the collections the caller sees that a series is in, in name\norder.",
+        "operationId": "listCollectionsOfSeries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The series",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Collection"
                   }
                 }
               }
@@ -4617,6 +5134,50 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SeriesOverview"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/series/{id}/reading-lists": {
+      "get": {
+        "tags": [
+          "lists"
+        ],
+        "summary": "Lists the reading lists the caller sees that hold a book of a series, in\nname order.",
+        "operationId": "listReadingListsOfSeries",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The series",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReadingList"
+                  }
                 }
               }
             }
@@ -6420,6 +6981,106 @@
           "gone"
         ]
       },
+      "Collection": {
+        "type": "object",
+        "description": "A collection: series someone picked by hand, from any library, in no\norder of their own. It belongs to the person who made it. A series stays\nin it under a new name, and leaves it when the series is deleted.",
+        "required": [
+          "id",
+          "name",
+          "series_count",
+          "book_count",
+          "unread_count",
+          "covers",
+          "made_by",
+          "mine",
+          "shared_with_all",
+          "shared_with"
+        ],
+        "properties": {
+          "book_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many books those series hold."
+          },
+          "cover": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Name of the collection's cover, for `/covers/{cover}`: that of its\nfirst series, by name, that has one."
+          },
+          "covers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The covers to show together as one: those of its first series, four\ndifferent ones at most."
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "made_by": {
+            "$ref": "#/components/schemas/UserName",
+            "description": "Whose collection it is: the person who made it."
+          },
+          "mine": {
+            "type": "boolean",
+            "description": "Whether it is the caller's own. Only then can they change it, and\nsay who it is shared with."
+          },
+          "name": {
+            "type": "string"
+          },
+          "series_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many of its series the caller may read."
+          },
+          "shared_with": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserName"
+            },
+            "description": "The people it is shared with one by one, in name order. Only the one\nwhose collection it is is told: it is empty for anyone else."
+          },
+          "shared_with_all": {
+            "type": "boolean",
+            "description": "Whether everyone on the server sees it."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many of those books the caller has not read to the end."
+          }
+        }
+      },
+      "CollectionDetails": {
+        "type": "object",
+        "description": "What a collection is called and said to be from now on. It is all of\nit: without a summary, the collection has none.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "At most 200 characters. No other collection of the caller's may have\nit."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "At most 4,000 characters."
+          }
+        },
+        "additionalProperties": false
+      },
       "CopySchedule": {
         "type": "object",
         "required": [
@@ -7051,6 +7712,34 @@
             ],
             "format": "int64",
             "description": "The series that the entry's series is: its issues are looked for\nthere. Give this or `book_id`, not both."
+          }
+        },
+        "additionalProperties": false
+      },
+      "NewCollection": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "At most 200 characters. No other collection of the caller's may have\nit: names that differ only in capitals, accents, spaces or\npunctuation count as the same."
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "description": "The series the collection starts with."
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "At most 4,000 characters."
           }
         },
         "additionalProperties": false
@@ -8200,6 +8889,8 @@
           "more_books",
           "lists",
           "more_lists",
+          "collections",
+          "more_collections",
           "people",
           "more_people"
         ],
@@ -8211,6 +8902,13 @@
             },
             "description": "Books found by their name, title, series, writer, penciller or\npublisher, in name order."
           },
+          "collections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Collection"
+            },
+            "description": "Collections found by their name, in name order."
+          },
           "lists": {
             "type": "array",
             "items": {
@@ -8221,6 +8919,10 @@
           "more_books": {
             "type": "boolean",
             "description": "Whether more books were found than are listed."
+          },
+          "more_collections": {
+            "type": "boolean",
+            "description": "Whether more collections were found than are listed."
           },
           "more_lists": {
             "type": "boolean",
@@ -8295,6 +8997,21 @@
           }
         }
       },
+      "SeriesAdded": {
+        "type": "object",
+        "description": "What adding series to a collection changed.",
+        "required": [
+          "series"
+        ],
+        "properties": {
+          "series": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many series the collection gained. The ones it already held are\nnot counted.",
+            "minimum": 0
+          }
+        }
+      },
       "SeriesName": {
         "type": "object",
         "required": [
@@ -8304,6 +9021,23 @@
           "name": {
             "type": "string",
             "description": "At most 200 characters. No other series of the library may have it:\nnames that differ only in capitals, accents, spaces or punctuation\ncount as the same."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SeriesNamed": {
+        "type": "object",
+        "description": "Some series, by their ids.",
+        "required": [
+          "series"
+        ],
+        "properties": {
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            }
           }
         },
         "additionalProperties": false
@@ -8380,7 +9114,7 @@
       },
       "Sharing": {
         "type": "object",
-        "description": "Who a reading list is shared with from now on. It is all of it: the\npeople left out no longer see the list.",
+        "description": "Who a reading list or a collection is shared with from now on. It is\nall of it: the people left out no longer see it.",
         "properties": {
           "everyone": {
             "type": "boolean",
@@ -8724,6 +9458,10 @@
     {
       "name": "lists",
       "description": "Reading lists, and making one from a CBL file"
+    },
+    {
+      "name": "collections",
+      "description": "Collections: series picked by hand, from any library"
     },
     {
       "name": "people",

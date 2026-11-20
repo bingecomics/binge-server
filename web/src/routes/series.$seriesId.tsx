@@ -2,11 +2,14 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
 import { memo } from "react";
 import type { Book, Group } from "../api/client";
+import { useCollectionsOfSeries } from "../api/collections";
 import { useBooks, useLibrary, useSeriesOverview } from "../api/libraries";
+import { useListsOfSeries } from "../api/lists";
 import { BookGrid, choiceProps, type Shown, shownIn } from "../components/BookGrid";
 import { BooksHeader } from "../components/BooksHeader";
 import { coverGridClass } from "../components/Cover";
 import { CoverChoices } from "../components/CoverChoices";
+import { In } from "../components/Facts";
 import { GroupCard } from "../components/GroupCard";
 import { EmptyGroup, EmptySeries } from "../components/NoBooks";
 import { NotOnServer } from "../components/Notice";
@@ -214,6 +217,8 @@ function SeriesPage() {
   const { seriesId } = Route.useParams();
   const overview = useSeriesOverview(seriesId);
   const { library } = useLibrary(overview.data?.series.library_id);
+  const collections = useCollectionsOfSeries(seriesId).data;
+  const lists = useListsOfSeries(seriesId).data;
   const books = useBooks(seriesId);
 
   if (overview.isPending) {
@@ -238,6 +243,23 @@ function SeriesPage() {
         bookCount={series.book_count}
         overview={overview.data}
         libraryId={series.library_id}
+        facts={
+          <>
+            <In
+              label={["Collection", "Collections"]}
+              things={collections}
+              link={(collection) => ({
+                to: "/collections/$collectionId",
+                params: { collectionId: collection.id },
+              })}
+            />
+            <In
+              label={["Reading list", "Reading lists"]}
+              things={lists}
+              link={(list) => ({ to: "/lists/$listId", params: { listId: list.id } })}
+            />
+          </>
+        }
         menu={
           <BooksMenu
             about={series.name}

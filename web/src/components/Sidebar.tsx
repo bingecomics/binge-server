@@ -1,5 +1,5 @@
 import { Link, useMatch } from "@tanstack/react-router";
-import { BookMarked, Bookmark, House, ListOrdered, LoaderCircle, Plus } from "lucide-react";
+import { BookMarked, Bookmark, House, Layers, ListOrdered, LoaderCircle, Plus } from "lucide-react";
 import { useState } from "react";
 import { useIsOwner } from "../api/account";
 import { isScanning, useLibraries } from "../api/libraries";
@@ -111,12 +111,13 @@ function Views() {
 
 /**
  * What there is to read, in a column beside the page: Home, the reading
- * lists, the kept pages, the views kept for the menu and the libraries.
+ * lists, the collections, the kept pages, the views kept for the menu and
+ * the libraries.
  * What was read is not here: it is looked at now and then, and the menu of
  * who is signed in leads to it. A narrow window has no room for the column:
  * there the name in the bar at the top leads Home, which shows the reading
  * lists and lists the libraries and those views, and the menu of who is
- * signed in leads to the kept pages too.
+ * signed in leads to the collections and the kept pages too.
  */
 export function Sidebar() {
   return (
@@ -124,6 +125,7 @@ export function Sidebar() {
       <nav aria-label="Main" className="flex flex-col gap-1">
         <NavLink to="/" icon={House} label="Home" />
         <NavLink to="/lists" icon={ListOrdered} label="Reading lists" withPagesUnder />
+        <NavLink to="/collections" icon={Layers} label="Collections" withPagesUnder />
         <NavLink to="/kept" icon={BookMarked} label="Kept pages" />
       </nav>
       <Views />

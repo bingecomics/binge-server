@@ -34,6 +34,13 @@ export function usePickedCount(): number {
   return picked.useValue((keys) => keys.size);
 }
 
+/** Whether something is picked and all of it is of one kind. */
+export function usePickedOnly(kind: Pickable["kind"]): boolean {
+  return picked.useValue(
+    (keys) => keys.size > 0 && [...keys].every((key) => key.startsWith(`${kind}:`)),
+  );
+}
+
 /** Whether anything is picked. Once something is, a click on a cover picks. */
 export function isPicking(): boolean {
   return picked.get().size > 0;

@@ -10,6 +10,7 @@ pub mod backup;
 pub mod catalog;
 pub mod cbl;
 pub mod changes;
+pub mod collections;
 pub mod comicinfo;
 mod covers;
 pub mod db;
@@ -26,6 +27,7 @@ pub mod reading;
 pub mod scan;
 pub mod search;
 mod settings;
+pub mod sharing;
 mod thumbnail;
 pub mod views;
 
@@ -39,13 +41,14 @@ pub use catalog::{
 };
 pub use cbl::{CblEntry, CblFound, CblHow, CblLine, CblPlan, CblRuleFor};
 pub use changes::{ChangeKind, ScanChange, ScanRecord};
+pub use collections::Collection;
 pub use comicinfo::ComicInfo;
 pub use covers::{CoverFrom, CoverOf};
 pub use db::{Database, DbError};
 pub use history::{ReadWriter, ReadingDay, ReadingMonth, ReadingNow, ReadingYear};
 pub use kept::KeptPage;
 pub use layout::Place;
-pub use lists::{ReadingList, ReadingListOverview, Sharing};
+pub use lists::{ReadingList, ReadingListOverview};
 pub use narrow::{
     Choice, Choices, Letter, Named, NamedPerson, Narrowing, ReadState, SeriesOrder, SeriesSort,
     Years,
@@ -57,6 +60,7 @@ pub use people::{Credited, Credits, Person, PersonName};
 pub use reading::{BooksToMark, Page, PageImage, Progress};
 pub use scan::{ScanPhase, ScanStatus};
 pub use search::Found;
+pub use sharing::Sharing;
 pub use views::{NewView, View, ViewChange};
 
 /// What to tell a person when the server failed in a way that is not theirs

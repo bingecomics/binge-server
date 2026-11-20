@@ -3,17 +3,23 @@ import { ChevronLeft, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { useOthers } from "../api/account";
 import { gotNoAnswer } from "../api/client";
-import { useDeleteList, useListBooks, useReadingList } from "../api/lists";
+import {
+  useChangeList,
+  useDeleteList,
+  useListBooks,
+  useReadingList,
+  useShareList,
+} from "../api/lists";
 import { BooksHeader } from "../components/BooksHeader";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CoverChoices } from "../components/CoverChoices";
 import { ListBooks } from "../components/ListBooks";
-import { ListDetailsDialog } from "../components/ListDetailsDialog";
 import { MenuItem } from "../components/Menu";
+import { NameAndSummaryDialog } from "../components/NameAndSummary";
 import { NotOnServer, ServerNotAnswering } from "../components/Notice";
 import { BooksMenu } from "../components/ReadMarks";
-import { ShareListDialog } from "../components/ShareListDialog";
+import { ShareDialog } from "../components/ShareDialog";
 import { ErrorText, textLinkClass, upLinkClass } from "../components/text";
 import { sharedWith } from "../format";
 
@@ -44,6 +50,8 @@ function ListPage() {
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const change = useChangeList(listId);
+  const share = useShareList(listId);
   const remove = useDeleteList(() => navigate({ to: "/lists", replace: true }));
 
   if (overview.isPending) {
@@ -138,8 +146,19 @@ function ListPage() {
         <ListBooks listId={list.id} books={books.data} mine={mine} />
       ) : null}
 
-      <ListDetailsDialog open={editing} onClose={() => setEditing(false)} list={list} />
-      <ShareListDialog open={sharing} onClose={() => setSharing(false)} list={list} />
+      <NameAndSummaryDialog
+        open={editing}
+        onClose={() => setEditing(false)}
+        title="Name and summary"
+        of={list}
+        save={change}
+        saveLabel="Save"
+      />
+      <ShareDialog open={sharing} onClose={() => setSharing(false)} made={list} share={share}>
+        Someone you share it with sees the books in it that they can read, and does not see the list
+        while they can read none of them. What you have read stays yours, and only you can change
+        the list.
+      </ShareDialog>
       <ConfirmDialog
         open={deleting}
         onClose={() => {

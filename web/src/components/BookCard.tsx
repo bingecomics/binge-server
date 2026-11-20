@@ -151,9 +151,8 @@ export const BookCard = memo(function BookCard({
   });
   return (
     <Card
-      what={{ kind: "books", id: book.id }}
+      what={unreadable ? undefined : { kind: "books", id: book.id }}
       about={about}
-      pickable={!unreadable}
       link={unreadable ? undefined : read}
       cover={book.cover}
       unreadable={unreadable}

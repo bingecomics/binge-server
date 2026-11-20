@@ -1,27 +1,45 @@
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { useOthers } from "../api/account";
-import type { ReadingList } from "../api/client";
-import { useShareList } from "../api/lists";
+import type { Sharing as Shared } from "../api/client";
+import type { Made } from "../format";
 import { Button } from "./Button";
 import { Dialog, DialogActions } from "./Dialog";
 import { Form } from "./Form";
 
-/** Who a list is shared with: nobody, everyone, or the people picked. */
+/** Who a thing is shared with: nobody, everyone, or the people picked. */
 type With = "nobody" | "everyone" | "chosen";
+
+/** What says who a thing is shared with from now on: see `useShareList`. */
+type Share = {
+  mutate: (sharing: Shared, options: { onSuccess: () => void }) => void;
+  isPending: boolean;
+  error: Error | null;
+  /** Forgets what went wrong the last time. */
+  reset: () => void;
+};
 
 const rowClass = "flex min-h-11 items-center gap-3";
 const boxClass = "size-5 shrink-0 accent-accent";
 
-/** The three ways a list is shared, and under the last the people to pick. */
-function Sharing({ list, onClose }: { list: ReadingList; onClose: () => void }) {
+/** The three ways a thing is shared, and under the last the people to pick. */
+function Sharing({
+  made,
+  share,
+  onClose,
+  children,
+}: {
+  made: Made;
+  share: Share;
+  onClose: () => void;
+  children: ReactNode;
+}) {
   const others = useOthers();
-  const share = useShareList(list.id);
   const [shared, setShared] = useState<With>(
-    list.shared_with_all ? "everyone" : list.shared_with.length > 0 ? "chosen" : "nobody",
+    made.shared_with_all ? "everyone" : made.shared_with.length > 0 ? "chosen" : "nobody",
   );
-  const [picked, setPicked] = useState(() => list.shared_with.map((person) => person.id));
-  // Someone taken off the server since the list was read has no box to
-  // untick, so they are not named again.
+  const [picked, setPicked] = useState(() => made.shared_with.map((person) => person.id));
+  // Someone taken off the server since it was read has no box to untick,
+  // so they are not named again.
   const people = picked.filter((id) => others.some((person) => person.id === id));
   const name = useId();
 
@@ -53,7 +71,7 @@ function Sharing({ list, onClose }: { list: ReadingList; onClose: () => void }) 
       }
     >
       <fieldset>
-        <legend className="sr-only">Who sees this list</legend>
+        <legend className="sr-only">Who sees it</legend>
         {ways.map((way) => (
           <label key={way.value} className={rowClass}>
             <input
@@ -90,28 +108,38 @@ function Sharing({ list, onClose }: { list: ReadingList; onClose: () => void }) 
           ))}
         </ul>
       ) : null}
-      <p className="mt-3 text-caption text-fg-muted">
-        Someone you share it with sees the books in it that they can read, and does not see the list
-        while they can read none of them. What you have read stays yours, and only you can change
-        the list.
-      </p>
+      <p className="mt-3 text-caption text-fg-muted">{children}</p>
     </Form>
   );
 }
 
-/** Asks who a reading list of the reader's is shared with. */
-export function ShareListDialog({
+/**
+ * Asks who a reading list or a collection of the reader's is shared with.
+ * `children` say what someone it is shared with sees of it.
+ */
+export function ShareDialog({
   open,
   onClose,
-  list,
+  made,
+  share,
+  children,
 }: {
   open: boolean;
   onClose: () => void;
-  list: ReadingList;
+  made: Made;
+  share: Share;
+  children: ReactNode;
 }) {
+  // What went wrong is not there again when the dialog is opened again.
+  function close() {
+    share.reset();
+    onClose();
+  }
   return (
-    <Dialog open={open} onClose={onClose} title={`Share “${list.name}”`}>
-      <Sharing list={list} onClose={onClose} />
+    <Dialog open={open} onClose={close} title={`Share “${made.name}”`}>
+      <Sharing made={made} share={share} onClose={close}>
+        {children}
+      </Sharing>
     </Dialog>
   );
 }

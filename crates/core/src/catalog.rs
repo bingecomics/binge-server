@@ -53,7 +53,11 @@ pub enum CatalogError {
     /// Holds the id of the reading list that has the name.
     #[error("reading list {0} already has that name")]
     ListNameTaken(i64),
-    #[error("the reading list is someone else's")]
+    /// Holds the id of the collection that has the name.
+    #[error("collection {0} already has that name")]
+    CollectionNameTaken(i64),
+    /// A reading list or a collection that someone else made.
+    #[error("it is someone else's")]
     NotYours,
     /// Holds the id of the person who goes by the name.
     #[error("person {0} already goes by that name")]
@@ -77,7 +81,9 @@ impl CatalogError {
     /// What to tell the person using the server. The cause goes to the log.
     pub fn for_people(&self) -> &str {
         match self {
-            Self::NotFound => "There is no such library, series, group, book or reading list.",
+            Self::NotFound => {
+                "There is no such library, series, group, book, reading list or collection."
+            }
             Self::NoSuchPage => "There is no such page.",
             Self::NoSuchRule => "There is no such rule.",
             Self::NoSuchPerson => "There is no such person.",
@@ -101,7 +107,11 @@ impl CatalogError {
                 "Another of your reading lists already has that name. Names that differ \
                  only in capitals, accents, spaces or punctuation count as the same."
             }
-            Self::NotYours => "Only the person who made a reading list can change it.",
+            Self::CollectionNameTaken(_) => {
+                "Another of your collections already has that name. Names that differ \
+                 only in capitals, accents, spaces or punctuation count as the same."
+            }
+            Self::NotYours => "Only the person who made it can change it.",
             Self::NameOfAnother(_) => {
                 "Someone else already goes by that name. Merge the two instead."
             }
@@ -114,13 +124,14 @@ impl CatalogError {
         }
     }
 
-    /// The id of the series, group, reading list or person that is in the
-    /// way of what was asked.
+    /// The id of the series, group, reading list, collection or person that
+    /// is in the way of what was asked.
     pub fn in_the_way(&self) -> Option<i64> {
         match self {
             Self::NameTaken(id)
             | Self::GroupExists(id)
             | Self::ListNameTaken(id)
+            | Self::CollectionNameTaken(id)
             | Self::NameOfAnother(id) => Some(*id),
             _ => None,
         }

@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import type { Series } from "../api/client";
 import { HoldingCard } from "./HoldingCard";
 
@@ -12,9 +12,12 @@ import { HoldingCard } from "./HoldingCard";
 export const SeriesCard = memo(function SeriesCard({
   series,
   titleAs = "h2",
+  more,
 }: {
   series: Series;
   titleAs?: "h2" | "h3";
+  /** What else its menu offers on the page it is shown on. */
+  more?: ReactNode;
 }) {
   return (
     <HoldingCard
@@ -25,6 +28,7 @@ export const SeriesCard = memo(function SeriesCard({
       name={series.name}
       bookCount={series.book_count}
       unreadCount={series.unread_count}
+      more={more}
     />
   );
 });

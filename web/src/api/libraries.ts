@@ -1,4 +1,10 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  type QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { type Asked, lettersQuery, seriesQuery } from "../narrowing";
 import { api, type ChangeKind, type Library, type NewLibrary, unwrap } from "./client";
 
@@ -250,14 +256,29 @@ export function useGroupBooks(groupId: number) {
   });
 }
 
+/** Under what every search is kept. */
+const SEARCH = [...CONTENTS, "search"];
+
 /**
- * The series, books, reading lists and people that hold every one of the
+ * Asks again for everything kept under `key`, and for what a search found:
+ * a search finds reading lists and collections, so a change to one of them
+ * changes what it shows.
+ */
+export function askAgainWithSearch(queryClient: QueryClient, key: string[]) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: key }),
+    queryClient.invalidateQueries({ queryKey: SEARCH }),
+  ]);
+}
+
+/**
+ * The series, books, reading lists, collections and people that hold every one of the
  * words: `limit` of each at most, or as many as the server gives. Asks
  * nothing without words.
  */
 export function useSearch(words: string, limit?: number) {
   return useQuery({
-    queryKey: [...CONTENTS, "search", words, limit],
+    queryKey: [...SEARCH, words, limit],
     queryFn: async () =>
       unwrap(await api.GET("/api/v1/search", { params: { query: { q: words, limit } } })),
     enabled: words !== "",

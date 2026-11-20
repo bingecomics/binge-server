@@ -15,6 +15,8 @@ import { Route as KeptRouteImport } from './routes/kept'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as BooksBookIdRouteImport } from './routes/books.$bookId'
+import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
+import { Route as CollectionsCollectionIdRouteImport } from './routes/collections.$collectionId'
 import { Route as LibrariesLibraryIdRouteImport } from './routes/libraries.$libraryId'
 import { Route as ListsIndexRouteImport } from './routes/lists.index'
 import { Route as ListsListIdRouteImport } from './routes/lists.$listId'
@@ -61,6 +63,16 @@ const SettingsRoute = SettingsRouteImport.update({
 const BooksBookIdRoute = BooksBookIdRouteImport.update({
   id: '/books/$bookId',
   path: '/books/$bookId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
+  id: '/collections/',
+  path: '/collections/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollectionsCollectionIdRoute = CollectionsCollectionIdRouteImport.update({
+  id: '/collections/$collectionId',
+  path: '/collections/$collectionId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LibrariesLibraryIdRoute = LibrariesLibraryIdRouteImport.update({
@@ -158,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRouteWithChildren
   '/books/$bookId': typeof BooksBookIdRoute
+  '/collections/$collectionId': typeof CollectionsCollectionIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
   '/lists/$listId': typeof ListsListIdRoute
   '/lists/import': typeof ListsImportRoute
@@ -170,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/settings/tokens': typeof SettingsTokensRoute
   '/settings/users': typeof SettingsUsersRoute
   '/settings/views': typeof SettingsViewsRoute
+  '/collections/': typeof CollectionsIndexRoute
   '/lists/': typeof ListsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/libraries/$libraryId/duplicates': typeof LibrariesLibraryIdDuplicatesRoute
@@ -182,6 +196,7 @@ export interface FileRoutesByTo {
   '/kept': typeof KeptRoute
   '/search': typeof SearchRoute
   '/books/$bookId': typeof BooksBookIdRoute
+  '/collections/$collectionId': typeof CollectionsCollectionIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
   '/lists/$listId': typeof ListsListIdRoute
   '/lists/import': typeof ListsImportRoute
@@ -194,6 +209,7 @@ export interface FileRoutesByTo {
   '/settings/tokens': typeof SettingsTokensRoute
   '/settings/users': typeof SettingsUsersRoute
   '/settings/views': typeof SettingsViewsRoute
+  '/collections': typeof CollectionsIndexRoute
   '/lists': typeof ListsIndexRoute
   '/settings': typeof SettingsIndexRoute
   '/libraries/$libraryId/duplicates': typeof LibrariesLibraryIdDuplicatesRoute
@@ -208,6 +224,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRouteWithChildren
   '/books/$bookId': typeof BooksBookIdRoute
+  '/collections/$collectionId': typeof CollectionsCollectionIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
   '/lists/$listId': typeof ListsListIdRoute
   '/lists/import': typeof ListsImportRoute
@@ -220,6 +237,7 @@ export interface FileRoutesById {
   '/settings/tokens': typeof SettingsTokensRoute
   '/settings/users': typeof SettingsUsersRoute
   '/settings/views': typeof SettingsViewsRoute
+  '/collections/': typeof CollectionsIndexRoute
   '/lists/': typeof ListsIndexRoute
   '/settings/': typeof SettingsIndexRoute
   '/libraries_/$libraryId/duplicates': typeof LibrariesLibraryIdDuplicatesRoute
@@ -235,6 +253,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/books/$bookId'
+    | '/collections/$collectionId'
     | '/libraries/$libraryId'
     | '/lists/$listId'
     | '/lists/import'
@@ -247,6 +266,7 @@ export interface FileRouteTypes {
     | '/settings/tokens'
     | '/settings/users'
     | '/settings/views'
+    | '/collections/'
     | '/lists/'
     | '/settings/'
     | '/libraries/$libraryId/duplicates'
@@ -259,6 +279,7 @@ export interface FileRouteTypes {
     | '/kept'
     | '/search'
     | '/books/$bookId'
+    | '/collections/$collectionId'
     | '/libraries/$libraryId'
     | '/lists/$listId'
     | '/lists/import'
@@ -271,6 +292,7 @@ export interface FileRouteTypes {
     | '/settings/tokens'
     | '/settings/users'
     | '/settings/views'
+    | '/collections'
     | '/lists'
     | '/settings'
     | '/libraries/$libraryId/duplicates'
@@ -284,6 +306,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/books/$bookId'
+    | '/collections/$collectionId'
     | '/libraries/$libraryId'
     | '/lists/$listId'
     | '/lists/import'
@@ -296,6 +319,7 @@ export interface FileRouteTypes {
     | '/settings/tokens'
     | '/settings/users'
     | '/settings/views'
+    | '/collections/'
     | '/lists/'
     | '/settings/'
     | '/libraries_/$libraryId/duplicates'
@@ -310,12 +334,14 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   BooksBookIdRoute: typeof BooksBookIdRoute
+  CollectionsCollectionIdRoute: typeof CollectionsCollectionIdRoute
   LibrariesLibraryIdRoute: typeof LibrariesLibraryIdRoute
   ListsListIdRoute: typeof ListsListIdRoute
   ListsImportRoute: typeof ListsImportRoute
   PeoplePersonIdRoute: typeof PeoplePersonIdRoute
   ReadBookIdRoute: typeof ReadBookIdRoute
   SeriesSeriesIdRoute: typeof SeriesSeriesIdRoute
+  CollectionsIndexRoute: typeof CollectionsIndexRoute
   ListsIndexRoute: typeof ListsIndexRoute
   LibrariesLibraryIdDuplicatesRoute: typeof LibrariesLibraryIdDuplicatesRoute
   LibrariesLibraryIdScansRoute: typeof LibrariesLibraryIdScansRoute
@@ -364,6 +390,20 @@ declare module '@tanstack/react-router' {
       path: '/books/$bookId'
       fullPath: '/books/$bookId'
       preLoaderRoute: typeof BooksBookIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections/': {
+      id: '/collections/'
+      path: '/collections'
+      fullPath: '/collections/'
+      preLoaderRoute: typeof CollectionsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collections/$collectionId': {
+      id: '/collections/$collectionId'
+      path: '/collections/$collectionId'
+      fullPath: '/collections/$collectionId'
+      preLoaderRoute: typeof CollectionsCollectionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/libraries/$libraryId': {
@@ -519,12 +559,14 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRouteWithChildren,
   BooksBookIdRoute: BooksBookIdRoute,
+  CollectionsCollectionIdRoute: CollectionsCollectionIdRoute,
   LibrariesLibraryIdRoute: LibrariesLibraryIdRoute,
   ListsListIdRoute: ListsListIdRoute,
   ListsImportRoute: ListsImportRoute,
   PeoplePersonIdRoute: PeoplePersonIdRoute,
   ReadBookIdRoute: ReadBookIdRoute,
   SeriesSeriesIdRoute: SeriesSeriesIdRoute,
+  CollectionsIndexRoute: CollectionsIndexRoute,
   ListsIndexRoute: ListsIndexRoute,
   LibrariesLibraryIdDuplicatesRoute: LibrariesLibraryIdDuplicatesRoute,
   LibrariesLibraryIdScansRoute: LibrariesLibraryIdScansRoute,

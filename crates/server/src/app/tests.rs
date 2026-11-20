@@ -1567,7 +1567,8 @@ async fn cbr_and_pdf_books_are_read_and_found_by_what_they_say() {
 fn nothing_found() -> Value {
     json!({
         "series": [], "more_series": false, "books": [], "more_books": false,
-        "lists": [], "more_lists": false, "people": [], "more_people": false,
+        "lists": [], "more_lists": false, "collections": [], "more_collections": false,
+        "people": [], "more_people": false,
     })
 }
 
@@ -1597,6 +1598,20 @@ impl Server {
             made["token"]["id"].as_i64().unwrap(),
             made["secret"].as_str().unwrap().to_owned(),
         )
+    }
+
+    /// The ids of a library's series, in name order.
+    async fn series_ids(&self, library_id: i64) -> Vec<i64> {
+        let series = self
+            .get(&format!("/api/v1/libraries/{library_id}/series"))
+            .await
+            .json()["series"]
+            .clone();
+        let series = series.as_array().unwrap();
+        series
+            .iter()
+            .map(|one| one["id"].as_i64().unwrap())
+            .collect()
     }
 
     /// Adds a second folder of comics as a library, and returns its id.
@@ -2529,6 +2544,255 @@ async fn a_reading_list_holds_books_in_an_order_across_series() {
     assert_eq!(server.delete(&at).await.status, StatusCode::NOT_FOUND);
     // The books are as they were.
     assert_eq!(server.get(&of_book(&saga_1)).await.json(), json!([]));
+}
+
+#[tokio::test]
+async fn a_collection_holds_series_and_is_its_makers_to_share() {
+    let server = server().await;
+    fixtures::write_book(&server.comics.join("Saga/Saga 001.cbz"), 2, 1);
+    fixtures::write_book(&server.comics.join("Paper Girls/Paper Girls 001.cbz"), 2, 2);
+    let comics = server.add_library().await;
+    let manga = server.add_second_library("Manga").await;
+    let ben_id = server.add_user("Ben", &[comics, manga]).await;
+    let cleo_id = server.add_user("Cleo", &[manga]).await;
+    let ben = server.signed_in_as("Ben", PASSWORD).await;
+    let cleo = server.signed_in_as("Cleo", PASSWORD).await;
+    let [paper, saga] = server.series_ids(comics).await[..] else {
+        panic!("two series");
+    };
+    let manga_series = server.series_ids(manga).await[0];
+    let collections = "/api/v1/collections";
+
+    // Anyone makes a collection, and it is theirs alone. A series named
+    // twice is in it once, and its series are shown by name.
+    let new =
+        json!({ "name": "Vaughan", "summary": " One writer ", "series": [saga, saga, paper] });
+    let made = ben.post(collections, new).await;
+    assert_eq!(made.status, StatusCode::CREATED);
+    let collection = made.json();
+    assert_eq!(collection["summary"], "One writer");
+    assert_eq!(collection["series_count"], 2);
+    assert_eq!(collection["book_count"], 2);
+    assert_eq!(collection["unread_count"], 2);
+    assert_eq!(collection["covers"].as_array().unwrap().len(), 2);
+    assert_eq!(collection["cover"], collection["covers"][0]);
+    assert_eq!(collection["mine"], true);
+    assert_eq!(
+        collection["made_by"],
+        json!({ "id": ben_id, "name": "Ben" })
+    );
+    assert_eq!(collection["shared_with_all"], false);
+    let at = format!("{collections}/{}", collection["id"]);
+    let series = format!("{at}/series");
+    let sharing = format!("{at}/sharing");
+    let held = ben.get(&series).await.json();
+    let names: Vec<&str> = held
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|one| one["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Paper Girls", "Saga"]);
+    let of_saga = format!("/api/v1/series/{saga}/collections");
+    assert_eq!(ben.get(&of_saga).await.json()[0]["id"], collection["id"]);
+
+    // The owner of the server is not shown it either.
+    assert_eq!(server.get(collections).await.json(), json!([]));
+    assert_eq!(server.get(&at).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(server.get(&series).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(server.get(&of_saga).await.json(), json!([]));
+    let found = server.get("/api/v1/search?q=vaughan").await.json();
+    assert_eq!(found["collections"], json!([]));
+    for hidden in [
+        server.patch(&at, json!({ "name": "Ours" })).await,
+        server.post(&series, json!({ "series": [saga] })).await,
+        server.put(&sharing, json!({ "everyone": true })).await,
+        server.delete(&format!("{series}/{saga}")).await,
+        server.delete(&at).await,
+    ] {
+        assert_refused(&hidden, StatusCode::NOT_FOUND, "not_found", "not shared");
+    }
+
+    // A name is taken among one person's collections.
+    let hers = server.post(collections, json!({ "name": "Vaughan" })).await;
+    assert_eq!(hers.status, StatusCode::CREATED);
+    let again = ben.post(collections, json!({ "name": "vaughan" })).await;
+    assert_refused(&again, StatusCode::CONFLICT, "conflict", "his own name");
+    assert_eq!(again.json()["conflicts_with"], collection["id"]);
+    let blank = ben.patch(&at, json!({ "name": "  " })).await;
+    assert_refused(
+        &blank,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "no name",
+    );
+
+    // Its maker gives it other details. Its own name spelled another way
+    // is not taken; the name of another of theirs is.
+    let respelled = json!({ "name": "VAUGHAN", "summary": "One writer" });
+    let changed = ben.patch(&at, respelled).await;
+    assert_eq!(changed.status, StatusCode::OK);
+    assert_eq!(changed.json()["name"], "VAUGHAN");
+    let other = ben
+        .post(collections, json!({ "name": "Other" }))
+        .await
+        .json();
+    let onto = json!({ "name": "other", "summary": "One writer" });
+    let taken = ben.patch(&at, onto).await;
+    assert_refused(&taken, StatusCode::CONFLICT, "conflict", "another of his");
+    assert_eq!(taken.json()["conflicts_with"], other["id"]);
+    let another = format!("{collections}/{}", other["id"]);
+    assert_eq!(ben.delete(&another).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(ben.get(&another).await.status, StatusCode::NOT_FOUND);
+
+    // A collection takes the series asked for, or nothing.
+    let unknown = ben
+        .post(&series, json!({ "series": [manga_series, 9999] }))
+        .await;
+    assert_refused(
+        &unknown,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "unknown",
+    );
+    let unread = json!({ "name": "Hers", "series": [saga] });
+    let refused = cleo.post(collections, unread).await;
+    assert_refused(
+        &refused,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "a library she does not read",
+    );
+    let added = ben
+        .post(&series, json!({ "series": [manga_series, saga] }))
+        .await;
+    assert_eq!(added.json(), json!({ "series": 1 }));
+
+    // A series stays in it under another name.
+    let renamed = server
+        .patch(
+            &format!("/api/v1/series/{saga}"),
+            json!({ "name": "Saga of Wreath" }),
+        )
+        .await;
+    assert_eq!(renamed.status, StatusCode::OK);
+    let held = ben.get(&series).await.json();
+    assert_eq!(held.as_array().unwrap().len(), 3);
+    assert!(
+        held.as_array()
+            .unwrap()
+            .iter()
+            .any(|one| one["name"] == "Saga of Wreath")
+    );
+    assert_eq!(ben.get(&of_saga).await.json()[0]["id"], collection["id"]);
+
+    // Shared with the people chosen: they see whose it is, the series
+    // they may read, and not who else it was shared with.
+    let shared = ben
+        .put(&sharing, json!({ "people": [cleo_id, ben_id] }))
+        .await;
+    assert_eq!(shared.status, StatusCode::OK);
+    assert_eq!(
+        shared.json()["shared_with"],
+        json!([{ "id": cleo_id, "name": "Cleo" }])
+    );
+    let seen = cleo.get(&at).await.json();
+    assert_eq!(seen["mine"], false);
+    assert_eq!(seen["made_by"]["name"], "Ben");
+    assert_eq!(seen["shared_with"], json!([]));
+    assert_eq!(seen["series_count"], 1);
+    assert_eq!(cleo.get(&series).await.json().as_array().unwrap().len(), 1);
+    assert_eq!(
+        cleo.get(collections).await.json()[0]["id"],
+        collection["id"]
+    );
+    assert_eq!(server.get(&at).await.status, StatusCode::NOT_FOUND);
+    // It is said with the series she reads, and found by its name. A
+    // series she may not read is not there for her to ask about.
+    let of_manga = format!("/api/v1/series/{manga_series}/collections");
+    assert_eq!(cleo.get(&of_manga).await.json()[0]["id"], collection["id"]);
+    assert_eq!(cleo.get(&of_saga).await.status, StatusCode::NOT_FOUND);
+    let found = cleo.get("/api/v1/search?q=vaughan").await.json();
+    assert_eq!(found["collections"][0]["id"], collection["id"]);
+    for refused in [
+        cleo.patch(&at, json!({ "name": "Ours" })).await,
+        cleo.post(&series, json!({ "series": [manga_series] }))
+            .await,
+        cleo.put(&sharing, json!({ "everyone": true })).await,
+        cleo.delete(&format!("{series}/{manga_series}")).await,
+        cleo.delete(&at).await,
+    ] {
+        assert_refused(
+            &refused,
+            StatusCode::FORBIDDEN,
+            "forbidden",
+            "someone else's",
+        );
+    }
+    let nobody = ben.put(&sharing, json!({ "people": [9999] })).await;
+    assert_refused(
+        &nobody,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "nobody",
+    );
+    assert_eq!(cleo.get(&at).await.status, StatusCode::OK);
+
+    // One that would show someone no series is not there for them.
+    let taken = ben.delete(&format!("{series}/{manga_series}")).await;
+    assert_eq!(taken.status, StatusCode::NO_CONTENT);
+    let again = ben.delete(&format!("{series}/{manga_series}")).await;
+    assert_eq!(again.status, StatusCode::NOT_FOUND);
+    assert_eq!(cleo.get(&at).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(cleo.get(collections).await.json(), json!([]));
+    assert_eq!(cleo.get(&of_manga).await.json(), json!([]));
+    let found = cleo.get("/api/v1/search?q=vaughan").await.json();
+    assert_eq!(found["collections"], json!([]));
+
+    // Shared with everyone, search finds it by its name.
+    let shared = ben.put(&sharing, json!({ "everyone": true })).await;
+    assert_eq!(shared.json()["shared_with"], json!([]));
+    assert_eq!(server.get(&at).await.json()["made_by"]["name"], "Ben");
+    let found = server.get("/api/v1/search?q=vaughan").await.json();
+    assert_eq!(found["collections"].as_array().unwrap().len(), 2);
+    // A sign standing alone among the words is in no name, and asks for
+    // nothing of one.
+    let found = server.get("/api/v1/search?q=vaughan%20-").await.json();
+    assert_eq!(found["collections"].as_array().unwrap().len(), 2);
+    let found = server.get("/api/v1/search?q=-").await.json();
+    assert_eq!(found["collections"], json!([]));
+
+    // The reading lists a series has a book in are said with it.
+    let book = server.first_book(comics).await;
+    let list = json!({ "name": "First issues", "books": [book["id"]] });
+    assert_eq!(
+        ben.post("/api/v1/reading-lists", list).await.status,
+        StatusCode::CREATED
+    );
+    let in_lists = |series: i64| format!("/api/v1/series/{series}/reading-lists");
+    assert_eq!(
+        ben.get(&in_lists(paper)).await.json()[0]["name"],
+        "First issues"
+    );
+    assert_eq!(ben.get(&in_lists(saga)).await.json(), json!([]));
+    assert_eq!(server.get(&in_lists(paper)).await.json(), json!([]));
+    assert_eq!(
+        cleo.get(&in_lists(paper)).await.status,
+        StatusCode::NOT_FOUND
+    );
+
+    // A series that is gone leaves the collection, which stays its maker's.
+    let removed = server.delete(&format!("/api/v1/libraries/{comics}")).await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    assert_eq!(ben.get(&at).await.json()["series_count"], 0);
+    assert_eq!(server.get(&at).await.status, StatusCode::NOT_FOUND);
+
+    // A collection goes with the person who made it.
+    let gone = server.delete(&format!("/api/v1/users/{ben_id}")).await;
+    assert_eq!(gone.status, StatusCode::NO_CONTENT);
+    let left = server.get(collections).await.json();
+    assert_eq!(left.as_array().unwrap().len(), 1);
+    assert_eq!(left[0]["mine"], true);
 }
 
 #[tokio::test]

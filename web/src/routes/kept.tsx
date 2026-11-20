@@ -51,8 +51,6 @@ function KeptCard({ kept }: { kept: KeptPage }) {
   const name = `${issueOf(book) ?? nameOf(book)}, page ${(page + 1).toLocaleString()}`;
   return (
     <Card
-      what={{ kind: "books", id: book.id }}
-      pickable={false}
       name={name}
       about={`${called(book)}, page ${(page + 1).toLocaleString()}`}
       link={{

@@ -29,10 +29,11 @@ function pickCardOf(part: Element, upTo = false) {
  *
  * Returns what to put on the card (`card`), on the link around its cover
  * (`link`), and the tick to put after the link. `name` is what the card is
- * called. A card that is not `pickable` gets nothing.
+ * called. A card with nothing to name (no `what`) cannot be picked, and
+ * gets nothing.
  */
-export function usePick(what: Pickable, name: string, pickable = true) {
-  const key = keyOf(what);
+export function usePick(what: Pickable | undefined, name: string) {
+  const key = what ? keyOf(what) : "";
   const picked = useIsPicked(key);
   // A finger that is resting on the card: where it came down, and the wait.
   const resting = useRef<{ x: number; y: number; wait: ReturnType<typeof setTimeout> }>(null);
@@ -46,7 +47,7 @@ export function usePick(what: Pickable, name: string, pickable = true) {
   // A card that goes away is not picked by a finger that was resting on it.
   useEffect(() => () => clearTimeout(resting.current?.wait), []);
 
-  if (!pickable) {
+  if (!what) {
     return { card: {}, link: {}, tick: null };
   }
   return {

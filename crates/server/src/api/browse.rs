@@ -10,6 +10,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
 use super::auth::Caller;
+use super::collections::Collection;
 use super::error::ApiError;
 use super::lists::ReadingList;
 use super::people::{Credit, Person};
@@ -603,6 +604,10 @@ pub struct SearchResults {
     pub lists: Vec<ReadingList>,
     /// Whether more reading lists were found than are listed.
     pub more_lists: bool,
+    /// Collections found by their name, in name order.
+    pub collections: Vec<Collection>,
+    /// Whether more collections were found than are listed.
+    pub more_collections: bool,
     /// People found by any name they go by, the ones most books name first.
     pub people: Vec<Person>,
     /// Whether more people were found than are listed.
@@ -610,7 +615,7 @@ pub struct SearchResults {
 }
 
 /// Searches what the caller may read. Finds the series, books, reading
-/// lists and people that hold every word of `q`, anywhere in a word, and
+/// lists, collections and people that hold every word of `q`, anywhere in a word, and
 /// answers with at most `limit` of each, saying when there are more. A
 /// search with no words finds nothing.
 #[utoipa::path(
@@ -637,6 +642,12 @@ async fn search(
         more_books: found.more_books,
         lists: found.lists.into_iter().map(ReadingList::from).collect(),
         more_lists: found.more_lists,
+        collections: found
+            .collections
+            .into_iter()
+            .map(Collection::from)
+            .collect(),
+        more_collections: found.more_collections,
         people: found.people.into_iter().map(Person::from).collect(),
         more_people: found.more_people,
     }))

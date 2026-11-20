@@ -4,6 +4,7 @@ mod account;
 mod auth;
 mod backups;
 mod browse;
+mod collections;
 mod covers;
 mod error;
 mod health;
@@ -59,6 +60,7 @@ const V1: &str = "/v1";
         (name = "covers", description = "Choosing the cover of a book, a series or a reading list"),
         (name = "reading", description = "Pages, progress, and what to read next"),
         (name = "lists", description = "Reading lists, and making one from a CBL file"),
+        (name = "collections", description = "Collections: series picked by hand, from any library"),
         (name = "people", description = "Who the books name, and the names they go by"),
         (name = "views", description = "A library narrowed and ordered, kept under a name"),
     )
@@ -105,6 +107,7 @@ fn guarded() -> OpenApiRouter<AppState> {
         .merge(covers::routes())
         .merge(reading::routes())
         .merge(lists::routes())
+        .merge(collections::routes())
         .merge(people::routes())
         .merge(views::routes())
         .merge(settings::routes())

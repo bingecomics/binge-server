@@ -3,6 +3,7 @@ import { SetupPage } from "../account/SetupPage";
 import { SignInPage } from "../account/SignInPage";
 import { useMe } from "../api/account";
 import { useHealth } from "../api/health";
+import { AddToCollectionDialog } from "../components/AddToCollection";
 import { AddToListDialog } from "../components/AddToList";
 import { ServerNotAnswering } from "../components/Notice";
 import { Problem } from "../components/Problem";
@@ -67,6 +68,7 @@ function Shell() {
       </div>
       <SelectionBar />
       <AddToListDialog />
+      <AddToCollectionDialog />
       <Problem />
     </div>
   );

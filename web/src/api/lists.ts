@@ -13,7 +13,7 @@ import {
   sayProblem,
   unwrap,
 } from "./client";
-import { CONTENTS } from "./libraries";
+import { askAgainWithSearch, CONTENTS } from "./libraries";
 import type { BooksToMark } from "./reading";
 
 /** Start of the key of everything asked about reading lists. Reading changes it, as it does the rest. */
@@ -66,13 +66,24 @@ export function useListsOfBook(bookId: number) {
   });
 }
 
+/** The reading lists that hold a book of a series. */
+export function useListsOfSeries(seriesId: number) {
+  return useQuery({
+    queryKey: [...LISTS, "of-series", seriesId],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/v1/series/{id}/reading-lists", { params: { path: { id: seriesId } } }),
+      ),
+  });
+}
+
 /** Makes a reading list of the reader's own, with books in it or none. */
 export function useCreateList() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (list: NewReadingList) =>
       unwrap(await api.POST("/api/v1/reading-lists", { body: list })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: LISTS }),
+    onSuccess: () => askAgainWithSearch(queryClient, LISTS),
   });
 }
 
@@ -84,7 +95,7 @@ export function useChangeList(id: number) {
       unwrap(
         await api.PATCH("/api/v1/reading-lists/{id}", { params: { path: { id } }, body: details }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: LISTS }),
+    onSuccess: () => askAgainWithSearch(queryClient, LISTS),
   });
 }
 
@@ -99,7 +110,7 @@ export function useShareList(id: number) {
           body: sharing,
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: LISTS }),
+    onSuccess: () => askAgainWithSearch(queryClient, LISTS),
   });
 }
 
@@ -124,7 +135,7 @@ export function useDeleteList(onDeleted: () => unknown) {
       unwrap(await api.DELETE("/api/v1/reading-lists/{id}", { params: { path: { id } } })),
     onSuccess: async () => {
       await onDeleted();
-      await queryClient.invalidateQueries({ queryKey: LISTS });
+      await askAgainWithSearch(queryClient, LISTS);
     },
   });
 }
@@ -150,7 +161,7 @@ export function useAddToList() {
           ? `Added ${bookCount(added.books)} to “${list.name}”.`
           : `“${list.name}” already holds all of that.`,
       );
-      return queryClient.invalidateQueries({ queryKey: LISTS });
+      return askAgainWithSearch(queryClient, LISTS);
     },
   });
 }
@@ -165,7 +176,7 @@ export function useRemoveFromList(listId: number) {
           params: { path: { id: listId, book_id: bookId } },
         }),
       ),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: LISTS }),
+    onSuccess: () => askAgainWithSearch(queryClient, LISTS),
     onError: sayProblem,
   });
 }
@@ -202,7 +213,7 @@ export function useMoveInList(listId: number) {
       sayProblem(error);
     },
     // The list's first covers and what to read next follow its order.
-    onSettled: () => queryClient.invalidateQueries({ queryKey: LISTS }),
+    onSettled: () => askAgainWithSearch(queryClient, LISTS),
   });
 }
 

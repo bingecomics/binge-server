@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 use crate::accounts::UserId;
 use crate::catalog::{Book, Catalog, CatalogError, GroupKind, PLACED, may_read};
 use crate::import::{self, name_key, written};
-use crate::lists::{UNREADABLE, list_with_key};
+use crate::lists::{LISTS, UNREADABLE};
 use crate::reading::list;
 
 /// The biggest CBL file read, in bytes: 5 MB. One entry is a line of text.
@@ -523,7 +523,11 @@ impl Catalog {
         let book = |id: &i64| by_id.get(id).cloned();
 
         let name_taken_by = match &cbl.name {
-            Some(name) => list_with_key(self.db.pool(), user, &name_key(name)).await?,
+            Some(name) => {
+                LISTS
+                    .with_key(self.db.pool(), user, &name_key(name))
+                    .await?
+            }
             None => None,
         };
         let lines = cbl

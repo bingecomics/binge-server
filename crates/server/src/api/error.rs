@@ -227,6 +227,7 @@ impl From<CatalogError> for ApiError {
             | CatalogError::NameTaken(_)
             | CatalogError::GroupExists(_)
             | CatalogError::ListNameTaken(_)
+            | CatalogError::CollectionNameTaken(_)
             | CatalogError::NameOfAnother(_)
             | CatalogError::NotEmpty => Some(ErrorCode::Conflict),
             _ => None,

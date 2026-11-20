@@ -592,8 +592,8 @@ impl Accounts {
         self.account(id).await
     }
 
-    /// Removes a user with their sessions, tokens, reading progress and
-    /// reading lists. The owner cannot be removed.
+    /// Removes a user with their sessions, tokens, reading progress,
+    /// reading lists and collections. The owner cannot be removed.
     pub async fn remove_user(&self, id: UserId) -> Result<(), AccountError> {
         self.not_the_owner(id).await?;
         sqlx::query("DELETE FROM user WHERE id = ?")

@@ -1,9 +1,10 @@
 import { useLocation } from "@tanstack/react-router";
-import { ListChecks, ListPlus, X } from "lucide-react";
+import { Layers, ListChecks, ListPlus, X } from "lucide-react";
 import { useEffect } from "react";
 import { useMarkRead } from "../api/reading";
 import { count } from "../format";
-import { pickAll, pickedIds, pickNone, usePickedCount } from "../selection";
+import { pickAll, pickedIds, pickNone, usePickedCount, usePickedOnly } from "../selection";
+import { askToAddToCollection } from "./AddToCollection";
 import { askToAddToList } from "./AddToList";
 import { Button } from "./Button";
 import { isOpenOverPage } from "./Menu";
@@ -21,6 +22,8 @@ const saidClass = "max-md:sr-only";
  */
 export function SelectionBar() {
   const picked = usePickedCount();
+  // A collection holds whole series.
+  const onlySeries = usePickedOnly("series");
   const mark = useMarkRead(pickNone);
   const page = useLocation({ select: (location) => location.href });
   const picking = picked > 0;
@@ -76,6 +79,15 @@ export function SelectionBar() {
           <ListPlus className="size-5" aria-hidden="true" />
           <span className={saidClass}>Add to a list</span>
         </Button>
+        {onlySeries ? (
+          <Button
+            onClick={() => askToAddToCollection(pickedIds().series, pickNone)}
+            title="Add to a collection"
+          >
+            <Layers className="size-5" aria-hidden="true" />
+            <span className={saidClass}>Add to a collection</span>
+          </Button>
+        ) : null}
         <Button variant="quiet" onClick={pickAll} title="Select everything in this list">
           <ListChecks className="size-5" aria-hidden="true" />
           <span className={saidClass}>Select all</span>

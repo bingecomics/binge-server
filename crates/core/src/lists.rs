@@ -9,29 +9,22 @@
 
 use std::collections::{HashMap, HashSet};
 
-use sqlx::{SqliteConnection, SqliteExecutor};
+use sqlx::SqliteConnection;
 
 use crate::accounts::{UserId, UserName};
 use crate::catalog::{
-    Book, CHOSEN, COVER, Catalog, CatalogError, UNREAD, YEAR, books, first_copy, may_read, now,
+    Book, CHOSEN, COVER, Catalog, CatalogError, PLACED, UNREAD, YEAR, books, first_copy, may_read,
+    now,
 };
 use crate::import;
 use crate::layout::a_name;
 use crate::overview::{BooksOverview, Summary};
 use crate::reading::{BooksToMark, MOST_NAMED, TOO_MANY_NAMED, list};
-
-/// How many covers a list shows together, as one.
-const COVERS_SHOWN: usize = 4;
-
-/// Longest summary a list takes, in characters.
-const MAX_SUMMARY: usize = 4000;
+use crate::sharing::{Kind, Sharing, a_summary, first_covers};
 
 /// What a request that names a book the list cannot take is answered with.
 const NOT_ON_SERVER: &str =
     "One of the books, groups, series or reading lists named is not on the server.";
-
-/// What sharing with someone who is not there is refused with.
-const NOT_A_USER: &str = "One of the people named is not on the server.";
 
 /// What a file that could not be read is refused with: it has no identity
 /// for a list to hold it by.
@@ -70,16 +63,6 @@ pub struct ReadingList {
     pub shared_with: Vec<UserName>,
 }
 
-/// Who a list is shared with from now on. It is all of it: the people not
-/// named no longer see the list.
-#[derive(Clone, Debug, Default)]
-pub struct Sharing {
-    /// Everyone on the server, those who join later too.
-    pub everyone: bool,
-    /// The people chosen one by one.
-    pub people: Vec<UserId>,
-}
-
 /// A reading list seen whole, for one reader.
 #[derive(Clone, Debug)]
 pub struct ReadingListOverview {
@@ -95,14 +78,21 @@ pub struct ReadingListOverview {
 pub(crate) fn may_see(list: &str) -> String {
     format!(
         "EXISTS (SELECT 1 FROM reading_list seen WHERE seen.id = {list} AND (seen.user_id = ?1 \
-         OR ((seen.shared_with_all OR EXISTS (SELECT 1 FROM reading_list_share shared \
-              WHERE shared.list_id = seen.id AND shared.user_id = ?1)) \
-             AND EXISTS (SELECT 1 FROM reading_list_book lb \
+         OR ({} AND EXISTS (SELECT 1 FROM reading_list_book lb \
               JOIN book b ON b.content_hash = lb.content_hash \
               WHERE lb.list_id = seen.id AND {}))))",
+        LISTS.shared_with_them("seen"),
         may_read("b.library_id")
     )
 }
+
+/// Reading lists, as things that are made and shared.
+pub(crate) const LISTS: Kind = Kind {
+    table: "reading_list",
+    shares: "reading_list_share",
+    of: "list_id",
+    may_see,
+};
 
 /// Selects the lists a user may see, without what is worked out from their
 /// books. Takes the user, then whatever `rest` asks for, from `?2`.
@@ -150,15 +140,7 @@ impl ReadingList {
             .iter()
             .filter(|book| seen.insert(book.content_hash.as_str()))
             .collect();
-        // Two books may show the same chosen cover.
-        let mut shown = HashSet::new();
-        let covers: Vec<String> = books
-            .iter()
-            .filter_map(|book| book.cover.as_deref())
-            .filter(|cover| shown.insert(*cover))
-            .take(COVERS_SHOWN)
-            .map(str::to_owned)
-            .collect();
+        let covers = first_covers(books.iter().filter_map(|book| book.cover.as_deref()));
         let years = || books.iter().filter_map(|book| book.year);
         let cover_chosen = row.chosen.is_some();
         Self {
@@ -186,63 +168,6 @@ impl ReadingList {
 /// A list's name as it is kept.
 fn list_name(name: &str) -> Result<&str, CatalogError> {
     a_name(name, "A reading list needs a name.")
-}
-
-/// A list's summary as it is kept: without the spaces around it, and none
-/// at all when nothing is left of it.
-fn list_summary(summary: Option<&str>) -> Result<Option<&str>, CatalogError> {
-    let summary = summary.map(str::trim).filter(|text| !text.is_empty());
-    if summary.is_some_and(|text| text.chars().count() > MAX_SUMMARY) {
-        return Err(CatalogError::Invalid(
-            "A summary is at most 4,000 characters.",
-        ));
-    }
-    Ok(summary)
-}
-
-/// The list of `user` that has a name, if any. A name is taken among one
-/// person's lists: two people may each have a list called the same.
-pub(crate) async fn list_with_key(
-    db: impl SqliteExecutor<'_>,
-    user: UserId,
-    name_key: &str,
-) -> Result<Option<i64>, CatalogError> {
-    Ok(
-        sqlx::query_scalar("SELECT id FROM reading_list WHERE user_id = ? AND name_key = ?")
-            .bind(user)
-            .bind(name_key)
-            .fetch_optional(db)
-            .await?,
-    )
-}
-
-/// Whether a list `user` sees is their own. A list they may not see is not
-/// there for them.
-async fn is_theirs(
-    db: impl SqliteExecutor<'_>,
-    user: UserId,
-    id: i64,
-) -> Result<bool, CatalogError> {
-    let query = format!(
-        "SELECT rl.user_id = ?1 FROM reading_list rl WHERE rl.id = ?2 AND {}",
-        may_see("rl.id")
-    );
-    let mine: Option<bool> = sqlx::query_scalar(&query)
-        .bind(user)
-        .bind(id)
-        .fetch_optional(db)
-        .await?;
-    mine.ok_or(CatalogError::NotFound)
-}
-
-/// Refuses unless the list is `user`'s own: only the one who made a list
-/// changes it. A list they may not see is not there for them.
-async fn theirs(db: impl SqliteExecutor<'_>, user: UserId, id: i64) -> Result<(), CatalogError> {
-    if is_theirs(db, user, id).await? {
-        Ok(())
-    } else {
-        Err(CatalogError::NotYours)
-    }
 }
 
 /// Puts books at the end of a list, in the order given, and returns how
@@ -322,6 +247,27 @@ impl Catalog {
         self.with_books(user, rows).await
     }
 
+    /// The reading lists that hold a book of a series, in name order.
+    pub async fn lists_of_series(
+        &self,
+        user: UserId,
+        series_id: i64,
+    ) -> Result<Vec<ReadingList>, CatalogError> {
+        self.series(user, series_id).await?;
+        let query = lists(&format!(
+            "AND EXISTS (SELECT 1 FROM reading_list_book of_it \
+             WHERE of_it.list_id = rl.id AND EXISTS (SELECT 1 FROM {PLACED} \
+             WHERE bp.content_hash = of_it.content_hash AND bp.series_id = ?2)) \
+             ORDER BY rl.name COLLATE natsort, rl.id"
+        ));
+        let rows = sqlx::query_as(&query)
+            .bind(user)
+            .bind(series_id)
+            .fetch_all(self.db.pool())
+            .await?;
+        self.with_books(user, rows).await
+    }
+
     /// Makes lists of their rows: adds what is worked out from the books
     /// `user` may read in each.
     pub(crate) async fn with_books(
@@ -354,7 +300,14 @@ impl Catalog {
         for book in held {
             by_list.entry(book.list_id).or_default().push(book);
         }
-        let mut shared_with = self.shared_with(&rows).await?;
+        // Who else a list was shared with is not said to someone it was
+        // shared with.
+        let mine: Vec<i64> = rows
+            .iter()
+            .filter(|row| row.mine)
+            .map(|row| row.id)
+            .collect();
+        let mut shared_with = LISTS.shared_with(self.db.pool(), &mine).await?;
         Ok(rows
             .into_iter()
             .map(|row| {
@@ -363,39 +316,6 @@ impl Catalog {
                 ReadingList::of(row, &held, shared_with)
             })
             .collect())
-    }
-
-    /// The people each of these lists is shared with one by one, in name
-    /// order, for the lists that are the asker's own. Who else a list was
-    /// shared with is not said to someone it was shared with.
-    async fn shared_with(&self, rows: &[Row]) -> Result<HashMap<i64, Vec<UserName>>, CatalogError> {
-        let mine: Vec<i64> = rows
-            .iter()
-            .filter(|row| row.mine)
-            .map(|row| row.id)
-            .collect();
-        if mine.is_empty() {
-            return Ok(HashMap::new());
-        }
-        // The ids are part of the statement, so it is not one to keep.
-        let query = format!(
-            "SELECT shared.list_id, u.id, u.name FROM reading_list_share shared \
-             JOIN user u ON u.id = shared.user_id WHERE shared.list_id IN ({}) \
-             ORDER BY u.name COLLATE natsort, u.id",
-            list(&mine)
-        );
-        let shares: Vec<(i64, UserId, String)> = sqlx::query_as(&query)
-            .persistent(false)
-            .fetch_all(self.db.pool())
-            .await?;
-        let mut by_list: HashMap<i64, Vec<UserName>> = HashMap::new();
-        for (list_id, id, name) in shares {
-            by_list
-                .entry(list_id)
-                .or_default()
-                .push(UserName { id, name });
-        }
-        Ok(by_list)
     }
 
     /// The books of a list `user` may read, in the list's order. A book the
@@ -407,7 +327,7 @@ impl Catalog {
     ) -> Result<Vec<Book>, CatalogError> {
         // A list holds books its reader may read whether or not it is
         // shown to them, so that is asked first.
-        is_theirs(self.db.pool(), user, list_id).await?;
+        LISTS.is_theirs(self.db.pool(), user, list_id).await?;
         self.books_of_seen_list(user, list_id).await
     }
 
@@ -532,11 +452,11 @@ impl Catalog {
         which: &BooksToMark,
     ) -> Result<ReadingList, CatalogError> {
         let name = list_name(name)?;
-        let summary = list_summary(summary)?;
+        let summary = a_summary(summary)?;
         let name_key = import::name_key(name);
         let identities = self.identities(user, which).await?;
         let mut tx = self.db.begin_write().await?;
-        if let Some(taken) = list_with_key(&mut *tx, user, &name_key).await? {
+        if let Some(taken) = LISTS.with_key(&mut *tx, user, &name_key).await? {
             return Err(CatalogError::ListNameTaken(taken));
         }
         let id: i64 = sqlx::query_scalar(
@@ -565,12 +485,12 @@ impl Catalog {
         summary: Option<&str>,
     ) -> Result<ReadingList, CatalogError> {
         let name = list_name(name)?;
-        let summary = list_summary(summary)?;
+        let summary = a_summary(summary)?;
         let name_key = import::name_key(name);
         let mut tx = self.db.begin_write().await?;
-        theirs(&mut *tx, user, id).await?;
+        LISTS.theirs(&mut *tx, user, id).await?;
         // Its own name written another way is not taken.
-        let taken = list_with_key(&mut *tx, user, &name_key).await?;
+        let taken = LISTS.with_key(&mut *tx, user, &name_key).await?;
         if let Some(other) = taken.filter(|other| *other != id) {
             return Err(CatalogError::ListNameTaken(other));
         }
@@ -587,46 +507,15 @@ impl Catalog {
 
     /// Says who a list of `user`'s is shared with from now on: see
     /// [`Sharing`]. Someone named who is not on the server refuses it, and
-    /// nothing changes. The one whose list it is needs no sharing, and
-    /// naming them changes nothing.
+    /// nothing changes.
     pub async fn share_list(
         &self,
         user: UserId,
         id: i64,
         sharing: &Sharing,
     ) -> Result<ReadingList, CatalogError> {
-        let people: HashSet<UserId> = sharing
-            .people
-            .iter()
-            .copied()
-            .filter(|person| *person != user)
-            .collect();
         let mut tx = self.db.begin_write().await?;
-        theirs(&mut *tx, user, id).await?;
-        sqlx::query("UPDATE reading_list SET shared_with_all = ? WHERE id = ?")
-            .bind(sharing.everyone)
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("DELETE FROM reading_list_share WHERE list_id = ?")
-            .bind(id)
-            .execute(&mut *tx)
-            .await?;
-        for person in people {
-            // Nothing is kept of a request that names someone who is not
-            // there: leaving here takes back what was written so far.
-            let put = sqlx::query(
-                "INSERT INTO reading_list_share (list_id, user_id) \
-                 SELECT ?, u.id FROM user u WHERE u.id = ?",
-            )
-            .bind(id)
-            .bind(person)
-            .execute(&mut *tx)
-            .await?;
-            if put.rows_affected() == 0 {
-                return Err(CatalogError::Invalid(NOT_A_USER));
-            }
-        }
+        LISTS.share(&mut tx, user, id, sharing).await?;
         tx.commit().await?;
         self.reading_list(user, id).await
     }
@@ -636,7 +525,7 @@ impl Catalog {
     pub async fn delete_list(&self, user: UserId, id: i64) -> Result<(), CatalogError> {
         // The cover chosen for it may be shown by nothing else afterwards.
         let _changing = self.changing_covers.lock().await;
-        theirs(self.db.pool(), user, id).await?;
+        LISTS.theirs(self.db.pool(), user, id).await?;
         let cover: Option<String> =
             sqlx::query_scalar("SELECT cover FROM reading_list_cover WHERE list_id = ?")
                 .bind(id)
@@ -667,7 +556,7 @@ impl Catalog {
     ) -> Result<u64, CatalogError> {
         let identities = self.identities(user, which).await?;
         let mut tx = self.db.begin_write().await?;
-        theirs(&mut *tx, user, id).await?;
+        LISTS.theirs(&mut *tx, user, id).await?;
         let added = append(&mut tx, id, &identities).await?;
         tx.commit().await?;
         Ok(added)
@@ -680,7 +569,7 @@ impl Catalog {
         id: i64,
         book_id: i64,
     ) -> Result<(), CatalogError> {
-        theirs(self.db.pool(), user, id).await?;
+        LISTS.theirs(self.db.pool(), user, id).await?;
         let identity = self.book(user, book_id).await?.content_hash;
         let removed =
             sqlx::query("DELETE FROM reading_list_book WHERE list_id = ? AND content_hash = ?")
@@ -714,7 +603,7 @@ impl Catalog {
             .content_hash
             .ok_or(CatalogError::NotFound)?;
         let mut tx = self.db.begin_write().await?;
-        theirs(&mut *tx, user, id).await?;
+        LISTS.theirs(&mut *tx, user, id).await?;
         // Every book of the list where it is now, and whether `user` is
         // shown it.
         let query = format!(

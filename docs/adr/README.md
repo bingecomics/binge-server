@@ -27,6 +27,7 @@ it, so nobody has to guess later or reopen it by accident.
 | [0019](0019-the-server-is-under-the-agpl.md) | The server is under the AGPL | Accepted |
 | [0020](0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases | Accepted |
 | [0021](0021-a-reading-list-is-its-makers-to-share.md) | A reading list is its maker's, to share | Accepted |
+| [0022](0022-a-collection-holds-series-and-is-shared-as-a-list-is.md) | A collection holds series, and is shared as a list is | Accepted |
 
 ## Adding one
 

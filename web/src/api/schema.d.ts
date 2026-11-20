@@ -238,6 +238,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the collections the caller sees, in name order: their own, and the
+         *     ones shared with them or with everyone. A collection of someone else's
+         *     that holds no series the caller may read is left out.
+         */
+        get: operations["listCollections"];
+        put?: never;
+        /**
+         * Makes a collection of the caller's own, with the series named in it from
+         *     the start. Nobody else sees it until it is shared.
+         * @description Every series named must be on the server: one that is not refuses the
+         *     request, and nothing is made. A series named twice is in the collection
+         *     once. One request names 10,000 at most.
+         */
+        post: operations["createCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/collections/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Returns one collection. */
+        get: operations["getCollection"];
+        put?: never;
+        post?: never;
+        /**
+         * Deletes a collection. Its series are not touched. Only the one whose
+         *     collection it is can.
+         */
+        delete: operations["deleteCollection"];
+        options?: never;
+        head?: never;
+        /**
+         * Gives a collection another name and summary. Its series stay. Only the
+         *     one whose collection it is can.
+         */
+        patch: operations["changeCollection"];
+        trace?: never;
+    };
+    "/api/v1/collections/{id}/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lists the series of a collection the caller may read, in name order. */
+        get: operations["listCollectionSeries"];
+        put?: never;
+        /**
+         * Puts the series named in a collection. A series it already holds stays.
+         *     Only the one whose collection it is can.
+         * @description Every series named must be on the server: one that is not refuses the
+         *     request, and nothing is added. One request names 10,000 at most.
+         */
+        post: operations["addToCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/collections/{id}/series/{series_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Takes a series out of a collection. Only the one whose collection it is
+         *     can.
+         */
+        delete: operations["removeFromCollection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/collections/{id}/sharing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Says who a collection is shared with from now on: everyone, the people
+         *     named, or nobody. Only the one whose collection it is can. The people it
+         *     is shared with see it, with the series they may read, and cannot change
+         *     it. Someone who may read none of its series does not see it.
+         * @description Everyone named must be on the server: someone who is not refuses the
+         *     request, and nothing changes. Naming the one whose collection it is
+         *     changes nothing.
+         */
+        put: operations["shareCollection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/continue-reading": {
         parameters: {
             query?: never;
@@ -1256,7 +1377,7 @@ export interface paths {
         };
         /**
          * Searches what the caller may read. Finds the series, books, reading
-         *     lists and people that hold every word of `q`, anywhere in a word, and
+         *     lists, collections and people that hold every word of `q`, anywhere in a word, and
          *     answers with at most `limit` of each, saying when there are more. A
          *     search with no words finds nothing.
          */
@@ -1310,6 +1431,26 @@ export interface paths {
          *     published.
          */
         get: operations["listBooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/series/{id}/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the collections the caller sees that a series is in, in name
+         *     order.
+         */
+        get: operations["listCollectionsOfSeries"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1393,6 +1534,26 @@ export interface paths {
          *     book to open next.
          */
         get: operations["getSeriesOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/series/{id}/reading-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists the reading lists the caller sees that hold a book of a series, in
+         *     name order.
+         */
+        get: operations["listReadingListsOfSeries"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2063,6 +2224,69 @@ export interface components {
          * @enum {string}
          */
         ChangeKind: "arrived" | "back" | "moved" | "gone";
+        /**
+         * @description A collection: series someone picked by hand, from any library, in no
+         *     order of their own. It belongs to the person who made it. A series stays
+         *     in it under a new name, and leaves it when the series is deleted.
+         */
+        Collection: {
+            /**
+             * Format: int64
+             * @description How many books those series hold.
+             */
+            book_count: number;
+            /**
+             * @description Name of the collection's cover, for `/covers/{cover}`: that of its
+             *     first series, by name, that has one.
+             */
+            cover?: string | null;
+            /**
+             * @description The covers to show together as one: those of its first series, four
+             *     different ones at most.
+             */
+            covers: string[];
+            /** Format: int64 */
+            id: number;
+            /** @description Whose collection it is: the person who made it. */
+            made_by: components["schemas"]["UserName"];
+            /**
+             * @description Whether it is the caller's own. Only then can they change it, and
+             *     say who it is shared with.
+             */
+            mine: boolean;
+            name: string;
+            /**
+             * Format: int64
+             * @description How many of its series the caller may read.
+             */
+            series_count: number;
+            /**
+             * @description The people it is shared with one by one, in name order. Only the one
+             *     whose collection it is is told: it is empty for anyone else.
+             */
+            shared_with: components["schemas"]["UserName"][];
+            /** @description Whether everyone on the server sees it. */
+            shared_with_all: boolean;
+            summary?: string | null;
+            /**
+             * Format: int64
+             * @description How many of those books the caller has not read to the end.
+             */
+            unread_count: number;
+        };
+        /**
+         * @description What a collection is called and said to be from now on. It is all of
+         *     it: without a summary, the collection has none.
+         */
+        CollectionDetails: {
+            /**
+             * @description At most 200 characters. No other collection of the caller's may have
+             *     it.
+             */
+            name: string;
+            /** @description At most 4,000 characters. */
+            summary?: string | null;
+        };
         CopySchedule: {
             /** @description Whether the server makes a copy every day. */
             scheduled: boolean;
@@ -2405,6 +2629,18 @@ export interface components {
              *     there. Give this or `book_id`, not both.
              */
             series_id?: number | null;
+        };
+        NewCollection: {
+            /**
+             * @description At most 200 characters. No other collection of the caller's may have
+             *     it: names that differ only in capitals, accents, spaces or
+             *     punctuation count as the same.
+             */
+            name: string;
+            /** @description The series the collection starts with. */
+            series?: number[];
+            /** @description At most 4,000 characters. */
+            summary?: string | null;
         };
         NewGroup: {
             kind: components["schemas"]["GroupKind"];
@@ -3000,10 +3236,14 @@ export interface components {
              *     publisher, in name order.
              */
             books: components["schemas"]["Book"][];
+            /** @description Collections found by their name, in name order. */
+            collections: components["schemas"]["Collection"][];
             /** @description Reading lists found by their name, in name order. */
             lists: components["schemas"]["ReadingList"][];
             /** @description Whether more books were found than are listed. */
             more_books: boolean;
+            /** @description Whether more collections were found than are listed. */
+            more_collections: boolean;
             /** @description Whether more reading lists were found than are listed. */
             more_lists: boolean;
             /** @description Whether more people were found than are listed. */
@@ -3043,6 +3283,15 @@ export interface components {
              */
             unread_count: number;
         };
+        /** @description What adding series to a collection changed. */
+        SeriesAdded: {
+            /**
+             * Format: int64
+             * @description How many series the collection gained. The ones it already held are
+             *     not counted.
+             */
+            series: number;
+        };
         SeriesName: {
             /**
              * @description At most 200 characters. No other series of the library may have it:
@@ -3050,6 +3299,10 @@ export interface components {
              *     count as the same.
              */
             name: string;
+        };
+        /** @description Some series, by their ids. */
+        SeriesNamed: {
+            series: number[];
         };
         /**
          * @description A series seen whole, for the page that presents it: what its books say
@@ -3083,8 +3336,8 @@ export interface components {
             };
         };
         /**
-         * @description Who a reading list is shared with from now on. It is all of it: the
-         *     people left out no longer see the list.
+         * @description Who a reading list or a collection is shared with from now on. It is
+         *     all of it: the people left out no longer see it.
          */
         Sharing: {
             /** @description Whether everyone on the server sees it, those who join later too. */
@@ -3716,6 +3969,368 @@ export interface operations {
                 };
             };
             /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listCollections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"][];
+                };
+            };
+        };
+    };
+    createCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewCollection"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            /** @description The name or the summary cannot be used, or a series named is not on the server */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another collection of the caller's has the name; `conflicts_with` is its id */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    deleteCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The collection is someone else's */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    changeCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionDetails"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            /** @description The name or the summary cannot be used */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The collection is someone else's */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Another collection of the caller's has the name; `conflicts_with` is its id */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listCollectionSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    addToCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesNamed"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesAdded"];
+                };
+            };
+            /** @description A series named is not on the server */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The collection is someone else's */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    removeFromCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+                /** @description The series */
+                series_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The collection is someone else's */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description No such collection, or the series is not in it */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    shareCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Sharing"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            /** @description Someone named is not on the server */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The collection is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6213,6 +6828,36 @@ export interface operations {
             };
         };
     };
+    listCollectionsOfSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The series */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"][];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     chooseSeriesCover: {
         parameters: {
             query?: never;
@@ -6434,6 +7079,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeriesOverview"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listReadingListsOfSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The series */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadingList"][];
                 };
             };
             404: {

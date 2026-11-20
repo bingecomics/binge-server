@@ -1,5 +1,5 @@
 import { Link, type LinkProps, useSearch as useAddress, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, ListOrdered, Search, User } from "lucide-react";
+import { ArrowRight, Layers, ListOrdered, Search, User } from "lucide-react";
 import {
   type FormEvent,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -10,7 +10,15 @@ import {
 } from "react";
 import { coverUrl, type SearchResults } from "../api/client";
 import { useSearch } from "../api/libraries";
-import { books as bookCount, called, madeBy, titleUnder, workOf, yearOf } from "../format";
+import {
+  books as bookCount,
+  called,
+  madeBy,
+  seriesCount,
+  titleUnder,
+  workOf,
+  yearOf,
+} from "../format";
 import { AFTER_TYPING, useSettled } from "../settled";
 import { navHeadingClass } from "./NavLink";
 
@@ -78,6 +86,21 @@ function groupsOf(found: SearchResults): { title: string; lines: Found[] }[] {
       ),
     },
     {
+      title: "Collections",
+      lines: found.collections.map(
+        (collection): Found => ({
+          key: `collection ${collection.id}`,
+          name: collection.name,
+          under: [seriesCount(collection.series_count), madeBy(collection)]
+            .filter(Boolean)
+            .join(" · "),
+          cover: collection.cover,
+          icon: Layers,
+          link: { to: "/collections/$collectionId", params: { collectionId: collection.id } },
+        }),
+      ),
+    },
+    {
       title: "People",
       lines: found.people.map(
         (person): Found => ({
@@ -99,7 +122,8 @@ const lineClass =
 
 /**
  * The search box in the bar at the top. What it finds shows under it as it
- * is typed, a few of each kind: series, books, reading lists and people.
+ * is typed, a few of each kind: series, books, reading lists, collections
+ * and people.
  * Enter leads to the search page, which shows everything found and keeps
  * the words in its address, so a search can be reloaded and shared. The
  * arrow keys go through what is under the box, and Enter then opens it.
@@ -224,7 +248,7 @@ export function SearchBox() {
           setAt(null);
         }}
         onKeyDown={onKeyDown}
-        aria-label="Search series, books, reading lists and people"
+        aria-label="Search series, books, reading lists, collections and people"
         aria-keyshortcuts={ON_A_MAC ? "Meta+K" : "Control+K"}
         placeholder="Search…"
         autoComplete="off"

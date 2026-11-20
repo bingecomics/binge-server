@@ -1,6 +1,7 @@
 import { Circle, CircleCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { type BooksToMark, useMarkRead } from "../api/reading";
+import { AddToCollectionChoice } from "./AddToCollection";
 import { AddToListChoice } from "./AddToList";
 import { MenuItem, MoreMenu } from "./Menu";
 
@@ -41,8 +42,8 @@ export function ReadMarks({
 /**
  * The menu of something that holds books (a series, a group of one, a
  * reading list), in the `corner` of its card or on its page: it marks every
- * book of it, and adds them all to a reading list. `children` are what else
- * the menu of a page offers.
+ * book of it, adds them all to a reading list, and adds whole series to a
+ * collection. `children` are what else the menu of a page offers.
  */
 export function BooksMenu({
   about,
@@ -61,6 +62,7 @@ export function BooksMenu({
     <MoreMenu about={about} corner={corner}>
       <ReadMarks all what={what} canRead={unreadCount > 0} />
       <AddToListChoice what={what} />
+      <AddToCollectionChoice what={what} />
       {children}
     </MoreMenu>
   );

@@ -214,8 +214,8 @@ export function UsersSection() {
         onConfirm={() => removing && remove.mutate(removing.id, { onSuccess: closeRemove })}
       >
         They can no longer sign in, their apps are disconnected, and their place in every book is
-        forgotten. The reading lists they made go with them, also for the people they shared them
-        with.
+        forgotten. The reading lists and collections they made go with them, also for the people
+        they shared them with.
       </ConfirmDialog>
     </Section>
   );

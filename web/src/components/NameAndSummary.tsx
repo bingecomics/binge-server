@@ -1,6 +1,4 @@
 import { useId, useState } from "react";
-import type { ReadingList } from "../api/client";
-import { useChangeList, useCreateList } from "../api/lists";
 import { Button } from "./Button";
 import { Dialog, DialogActions } from "./Dialog";
 import { Field, fieldClass } from "./Field";
@@ -9,21 +7,31 @@ import { Form } from "./Form";
 /** The longest summary the server keeps, in characters. */
 const LONGEST_SUMMARY = 4000;
 
-/** The two fields, and what saving them does: a new list, or the list's new details. */
-function Details({
-  list,
-  onClose,
-  onSaved,
-}: {
-  list?: ReadingList;
+/** What makes a thing with a name and a summary, or gives one new ones. */
+type Save<T> = {
+  mutate: (
+    details: { name: string; summary: string },
+    options: { onSuccess: (saved: T) => void },
+  ) => void;
+  isPending: boolean;
+  error: Error | null;
+  /** Forgets what went wrong the last time. */
+  reset: () => void;
+};
+
+type Props<T> = {
+  /** What has them now. A new thing has none. */
+  of?: { name: string; summary?: string | null };
+  save: Save<T>;
+  saveLabel: string;
   onClose: () => void;
-  onSaved?: (list: ReadingList) => void;
-}) {
-  const create = useCreateList();
-  const change = useChangeList(list?.id ?? 0);
-  const save = list ? change : create;
-  const [name, setName] = useState(list?.name ?? "");
-  const [summary, setSummary] = useState(list?.summary ?? "");
+  onSaved?: (saved: T) => void;
+};
+
+/** The two fields, filled with what `of` has when the dialog opens. */
+function Details<T>({ of, save, saveLabel, onClose, onSaved }: Props<T>) {
+  const [name, setName] = useState(of?.name ?? "");
+  const [summary, setSummary] = useState(of?.summary ?? "");
   const summaryId = useId();
 
   return (
@@ -44,7 +52,7 @@ function Details({
       actions={
         <DialogActions onCancel={onClose}>
           <Button type="submit" variant="primary" disabled={save.isPending || name.trim() === ""}>
-            {list ? "Save" : "Make the list"}
+            {saveLabel}
           </Button>
         </DialogActions>
       }
@@ -72,24 +80,24 @@ function Details({
 }
 
 /**
- * Asks for the name of a reading list and what it is about: of a new one,
- * or of `list` to change them. `onSaved` runs with the list as the server
- * has it.
+ * Asks for the name of a reading list or a collection and what it is about:
+ * of a new one, or of `of` to change them. `save` is what makes it or
+ * changes it, and `onSaved` runs with what was saved as the server has it.
  */
-export function ListDetailsDialog({
+export function NameAndSummaryDialog<T>({
   open,
+  title,
   onClose,
-  list,
-  onSaved,
-}: {
-  open: boolean;
-  onClose: () => void;
-  list?: ReadingList;
-  onSaved?: (list: ReadingList) => void;
-}) {
+  ...props
+}: Props<T> & { open: boolean; title: string }) {
+  // What went wrong is not there again when the dialog is opened again.
+  function close() {
+    props.save.reset();
+    onClose();
+  }
   return (
-    <Dialog open={open} onClose={onClose} title={list ? "Name and summary" : "New reading list"}>
-      <Details list={list} onClose={onClose} onSaved={onSaved} />
+    <Dialog open={open} onClose={close} title={title}>
+      <Details {...props} onClose={close} />
     </Dialog>
   );
 }

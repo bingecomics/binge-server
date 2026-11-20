@@ -3,6 +3,7 @@ import { User } from "lucide-react";
 import type { Person } from "../api/client";
 import { useSearch } from "../api/libraries";
 import { BookCard } from "../components/BookCard";
+import { CollectionCard } from "../components/CollectionCard";
 import { ListCard } from "../components/ListCard";
 import { SeriesCard } from "../components/SeriesCard";
 import { Shelf, shelfTitleClass } from "../components/Shelf";
@@ -60,9 +61,9 @@ function Results({ words }: { words: string }) {
   if (!found.data) {
     return null;
   }
-  const { series, books, lists, people, more_series, more_books, more_lists, more_people } =
-    found.data;
-  if (series.length + books.length + lists.length + people.length === 0) {
+  const { series, books, lists, collections, people } = found.data;
+  const { more_series, more_books, more_lists, more_collections, more_people } = found.data;
+  if (series.length + books.length + lists.length + collections.length + people.length === 0) {
     // While the answer shown is still the one to the words before, it says
     // nothing about these.
     return found.isPlaceholderData ? null : (
@@ -92,6 +93,16 @@ function Results({ words }: { words: string }) {
           ))}
         </Shelf>
       ) : null}
+      {collections.length ? (
+        <Shelf
+          title="Collections"
+          note={more_collections ? <Cut shown={collections.length} what="collections" /> : null}
+        >
+          {collections.map((collection) => (
+            <CollectionCard key={collection.id} collection={collection} titleAs="h3" />
+          ))}
+        </Shelf>
+      ) : null}
       {people.length ? <People people={people} more={more_people} /> : null}
       {books.length ? (
         <Shelf title="Books" note={more_books ? <Cut shown={books.length} what="books" /> : null}>
@@ -118,9 +129,9 @@ function SearchPage() {
         <Results words={words} />
       ) : (
         <p className="max-w-xl text-fg-muted">
-          Type in the box at the top. It finds series and reading lists by their name, books by
-          their name, title, writer, penciller or publisher, and people by any of the names they go
-          by. Capital letters and accents do not matter.
+          Type in the box at the top. It finds series, reading lists and collections by their name,
+          books by their name, title, writer, penciller or publisher, and people by any of the names
+          they go by. Capital letters and accents do not matter.
         </p>
       )}
     </>

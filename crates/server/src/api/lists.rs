@@ -36,6 +36,7 @@ pub(super) fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(remove_book))
         .routes(routes!(move_book))
         .routes(routes!(lists_of_book))
+        .routes(routes!(lists_of_series))
         .routes(routes!(keep_rule))
         .routes(routes!(forget_rule))
         .merge(files)
@@ -176,8 +177,8 @@ pub struct ReadingListDetails {
     pub summary: Option<String>,
 }
 
-/// Who a reading list is shared with from now on. It is all of it: the
-/// people left out no longer see the list.
+/// Who a reading list or a collection is shared with from now on. It is
+/// all of it: the people left out no longer see it.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Sharing {
@@ -188,6 +189,15 @@ pub struct Sharing {
     /// /users/names`.
     #[serde(default)]
     pub people: Vec<i64>,
+}
+
+impl From<Sharing> for binge_core::Sharing {
+    fn from(sharing: Sharing) -> Self {
+        Self {
+            everyone: sharing.everyone,
+            people: sharing.people.into_iter().map(binge_core::UserId).collect(),
+        }
+    }
 }
 
 /// What adding books to a list changed.
@@ -351,13 +361,9 @@ async fn share(
     Path(id): Path<i64>,
     Json(sharing): Json<Sharing>,
 ) -> Result<Json<ReadingList>, ApiError> {
-    let sharing = binge_core::Sharing {
-        everyone: sharing.everyone,
-        people: sharing.people.into_iter().map(binge_core::UserId).collect(),
-    };
     let list = state
         .catalog
-        .share_list(caller.user.id, id, &sharing)
+        .share_list(caller.user.id, id, &sharing.into())
         .await?;
     Ok(Json(list.into()))
 }
@@ -516,6 +522,25 @@ async fn lists_of_book(
     Path(id): Path<i64>,
 ) -> Result<Json<Vec<ReadingList>>, ApiError> {
     let lists = state.catalog.lists_of_book(caller.user.id, id).await?;
+    Ok(Json(lists.into_iter().map(ReadingList::from).collect()))
+}
+
+/// Lists the reading lists the caller sees that hold a book of a series, in
+/// name order.
+#[utoipa::path(
+    get,
+    path = "/series/{id}/reading-lists",
+    tag = "lists",
+    operation_id = "listReadingListsOfSeries",
+    params(("id" = i64, Path, description = "The series")),
+    responses((status = OK, body = [ReadingList]), (status = NOT_FOUND, body = ApiError))
+)]
+async fn lists_of_series(
+    State(state): State<AppState>,
+    caller: Caller,
+    Path(id): Path<i64>,
+) -> Result<Json<Vec<ReadingList>>, ApiError> {
+    let lists = state.catalog.lists_of_series(caller.user.id, id).await?;
     Ok(Json(lists.into_iter().map(ReadingList::from).collect()))
 }
 

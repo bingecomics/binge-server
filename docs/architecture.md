@@ -81,7 +81,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `accounts.rs` | Users, passwords, sessions, API tokens, and which libraries a user may read |
 | `archive.rs` | Reads a comic file: its pages in order, their sizes, the images themselves, the book's identity. `archive/zip.rs`, `archive/rar.rs` and `archive/pdf.rs` each read one format |
 | `comicinfo.rs` | Reads what a file says about itself in `ComicInfo.xml` |
-| `search.rs` | Finds series, books, reading lists and people by their words |
+| `search.rs` | Finds series, books, reading lists, collections and people by their words |
 | `narrow.rs` | A library's series in an order, narrowed by what their books say, a part at a time |
 | `people.rs` | The people books name, the names they go by, and making two of them one |
 | `views.rs` | A library narrowed and ordered, kept under a name for Home and the menu |
@@ -93,6 +93,8 @@ iteration 6 will be a third crate on top of the same core, next to
 | `thumbnail.rs` | Makes and stores cover images, and makes a page small |
 | `covers.rs` | The covers people chose for a book, a series or a reading list |
 | `lists.rs` | Reading lists: books of any series in a chosen order |
+| `collections.rs` | Collections: series picked by hand, from any library |
+| `sharing.rs` | What reading lists and collections share: whose a thing is, and who it is shared with |
 | `cbl.rs` | Reads a CBL file and finds the book each of its entries means |
 | `natural.rs` | Name order where "Issue 2" comes before "Issue 10", and a name with an accent sits with its letter |
 | `fixtures.rs` | Makes small comics for tests. Compiled for tests only |
@@ -184,7 +186,7 @@ The routes today:
 | `PUT /me/settings/{key}`, `DELETE` | Keep a value under a key; forget it |
 | `GET /server/backups`, `POST`, `PATCH` | For the owner: the copies of the database and whether one is made every day; make one now; turn the daily copy on or off |
 | `GET /server/update`, `PATCH`, `POST`, `POST /server/update/look` | For the owner: the version that runs, the newer one the last look found and how far an update is; turn the daily look on or off; bring the server to the newer version, named in the request; look now |
-| `GET /search?q=` | The series, books, reading lists and people that hold every word of `q` |
+| `GET /search?q=` | The series, books, reading lists, collections and people that hold every word of `q` |
 | `GET /people` | A part of the people the books name, the ones most books name first; with `q`, those a name of whom holds its words |
 | `GET /people/{id}` | One person the books name, with every name they go by |
 | `GET /people/{id}/series`, `GET /people/{id}/books` | The series that hold a book that names them; a part of those books |
@@ -198,7 +200,13 @@ The routes today:
 | `GET /reading-lists/{id}/books`, `POST` | Its books in its order; the one whose list it is adds books, groups, series or other lists at its end |
 | `DELETE /reading-lists/{id}/books/{book_id}` | The one whose list it is takes a book out of it |
 | `PUT /reading-lists/{id}/books/{book_id}/position` | The one whose list it is moves a book of it to a position among the books shown |
-| `GET /books/{id}/reading-lists` | The reading lists the caller sees that a book is in |
+| `GET /books/{id}/reading-lists`, `GET /series/{id}/reading-lists` | The reading lists the caller sees that a book is in; that hold a book of a series |
+| `GET /collections`, `POST /collections` | The collections the caller sees: their own and the ones shared with them; anyone makes one of their own, with series in it or none |
+| `GET /collections/{id}`, `PATCH`, `DELETE` | One collection; the one whose it is gives it another name and summary; deletes it |
+| `PUT /collections/{id}/sharing` | The one whose collection it is says who sees it: everyone, the people named, or nobody else |
+| `GET /collections/{id}/series`, `POST` | Its series by name; the one whose collection it is adds series |
+| `DELETE /collections/{id}/series/{series_id}` | The one whose collection it is takes a series out of it |
+| `GET /series/{id}/collections` | The collections the caller sees that a series is in |
 | `POST /reading-lists/import` | Asks what a CBL file would make: the body is the file. Nothing is made |
 | `POST /reading-lists/import/rules`, `DELETE /reading-lists/import/rules/{id}` | Keeps what the caller says an entry of a CBL file means, for their imports from now on; forgets it |
 | `GET /users/names` | Everyone on the server by name and id, for any caller: who something can be shared with |
@@ -281,14 +289,15 @@ from anywhere. On every page but the settings', a window at least 1024 px
 wide also has a slider there for the size of the covers: one size for every grid
 and row, from 6 to 13 rem, kept by the server for each person
 (`cover-size`, see "What a person chose" below). The menu lists
-Home, the reading lists, what the person read, the views kept for the
-menu and the libraries. On a settings page it is the settings' own menu
+Home, the reading lists, the collections, the kept pages, the views kept
+for the menu and the libraries. On a settings page it is the settings' own menu
 instead, a page for each part: `/settings/account`,
 `/settings/tokens`, and for the owner `/settings/users`,
 `/settings/libraries`, `/settings/views` and `/settings/server`. A narrow
 window has no room beside the page: there the settings' menu is a row
-above it, and the reading lists, the views of the menu and the libraries
-are reached from Home.
+above it, the reading lists, the views of the menu and the libraries
+are reached from Home, and the collections from the menu of who is signed
+in.
 
 **Menus and picking several.** Every card of a book, a group, a series or
 a reading list has a menu in the corner of its cover, and so has the page of each, of a
@@ -804,6 +813,40 @@ picked, for everyone; one dialog, mounted in the frame, asks which of the
 person's own lists or the name of a new one. `/lists/import` shows the plan as a table with a button on each
 line to say what the entry is. A book's page says which lists it is in.
 
+### Collections
+
+A collection is a name, a summary and series picked by hand from any
+library, in no order of their own
+([ADR 0022](adr/0022-a-collection-holds-series-and-is-shared-as-a-list-is.md)).
+
+- **What it holds.** `collection_series` links a collection to the record
+  of a series. A series stays in it under another name and with other
+  books, and leaves it when it is deleted or its library is removed. A
+  caller is shown the series of libraries they may read, by name, and
+  `series_count`, `book_count` and `unread_count` are counted among
+  those.
+- **Whose it is and who sees it.** As a reading list: `collection.user_id`
+  is the maker, `shared_with_all` and `collection_share` say who else
+  sees it, and one SQL condition, `collections::may_see`, says so
+  everywhere a collection is read. Someone it is shared with sees it only
+  while it holds a series they may read. The part the two kinds share is
+  `sharing.rs`: whether a thing is the caller's, the 403 and the 404 of a
+  change to someone else's, and who it is shared with.
+- **Cover.** `covers` names those of its first series, four different
+  ones at most, and `cover` the first. None is chosen for it.
+
+**In the web app.** `/collections` shows a person's own collections and,
+apart from them, the ones shared with them. `/collections/$collectionId`
+shows one: its series as the cards every page uses, whose it is or who
+sees it, and for the maker the menu that renames, shares and deletes it.
+The maker takes a series out from the menu of its card there. "Add to a
+collection…" is in the menu of a series and in the bar of what is picked
+while only series are picked; one dialog, mounted in the frame, asks
+which of the person's own collections or the name of a new one. The
+dialogs that name and share a collection are the ones a reading list
+uses. A series' page says which collections it is in and which reading
+lists hold a book of it.
+
 ## Reading and progress
 
 **Pages.** `GET /books/{id}/pages` lists a book's pages with the width and
@@ -1111,7 +1154,8 @@ names. The server listens on `127.0.0.1` unless told otherwise; `--bind
   took off their "Up next", and when), `book_cover`, `series_cover` and
   `reading_list_cover` (the cover chosen for a book identity; for a series;
   for a reading list), `reading_list` (whose it is, a name, a summary and
-  whether everyone sees it), `reading_list_share` (a person a list is
+  whether everyone sees it), `collection`, `collection_series` and
+  `collection_share` (the same for a collection and its series), `reading_list_share` (a person a list is
   shared with), `reading_list_book` (a book identity and its position in
   a list), `cbl_rule` (what a person said an entry of a CBL file means),
   `person` (someone the books name, and the name they are shown by),
@@ -1205,3 +1249,4 @@ Listed here so the parts above make sense. Details are in
 | [0019](adr/0019-the-server-is-under-the-agpl.md) | The server is under the AGPL |
 | [0020](adr/0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases |
 | [0021](adr/0021-a-reading-list-is-its-makers-to-share.md) | A reading list is its maker's, to share |
+| [0022](adr/0022-a-collection-holds-series-and-is-shared-as-a-list-is.md) | A collection holds series, and is shared as a list is |

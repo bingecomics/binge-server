@@ -10,11 +10,11 @@ import { BookReadMarks, doneOf, ReadUnrecorded, Standing } from "../components/B
 import { buttonClass } from "../components/Button";
 import { Cover } from "../components/Cover";
 import { CoverChoices } from "../components/CoverChoices";
-import { Fact, Facts } from "../components/Facts";
+import { Fact, Facts, In } from "../components/Facts";
 import { MoreMenu } from "../components/Menu";
 import { NarrowedLink, PeopleLinks } from "../components/NarrowedLink";
 import { BookNotOpened } from "../components/Notice";
-import { textLinkClass, upLinkClass } from "../components/text";
+import { upLinkClass } from "../components/text";
 import { called, language, moment, published, size, titleUnder, yearOf } from "../format";
 import { homeOf } from "../reader/home";
 
@@ -97,22 +97,12 @@ function BookFacts({ book }: { book: Book }) {
 
 /** The reading lists the book is in, each leading to its page. Nothing for a book in none. */
 function InLists({ bookId }: { bookId: number }) {
-  const lists = useListsOfBook(bookId);
-  if (!lists.data?.length) {
-    return null;
-  }
   return (
-    <Fact label={lists.data.length === 1 ? "Reading list" : "Reading lists"}>
-      <ul>
-        {lists.data.map((list) => (
-          <li key={list.id}>
-            <Link to="/lists/$listId" params={{ listId: list.id }} className={textLinkClass}>
-              {list.name}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Fact>
+    <In
+      label={["Reading list", "Reading lists"]}
+      things={useListsOfBook(bookId).data}
+      link={(list) => ({ to: "/lists/$listId", params: { listId: list.id } })}
+    />
   );
 }
 

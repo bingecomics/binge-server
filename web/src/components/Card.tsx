@@ -42,13 +42,12 @@ const liftClass =
  * what the card is to someone who cannot see it, for its tick: its name,
  * unless the page around the card says part of it.
  * `menu` goes in the corner of the cover, and the tick that picks the card
- * in the other, unless it is not `pickable`.
+ * in the other, when the card says `what` a pick of it names.
  */
 export function Card({
   what,
   name,
   about = name,
-  pickable = true,
   link,
   cover,
   covers,
@@ -60,10 +59,10 @@ export function Card({
   standing,
   menu,
 }: {
-  what: Pickable;
+  /** What a pick of the card names. A card with none cannot be picked. */
+  what?: Pickable;
   name: string;
   about?: string;
-  pickable?: boolean;
   link?: LinkProps;
   cover?: string | null;
   /** The covers a reading list shows together as one: see `Cover`. */
@@ -78,7 +77,7 @@ export function Card({
   standing: ReactNode;
   menu?: ReactNode;
 }) {
-  const pick = usePick(what, about, pickable);
+  const pick = usePick(what, about);
   const inside = (
     <>
       <div className={liftClass}>

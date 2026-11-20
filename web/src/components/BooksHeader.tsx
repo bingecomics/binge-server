@@ -222,6 +222,7 @@ export function BooksHeader({
   listId,
   inGroup = false,
   whose,
+  facts,
   menu,
   up,
 }: {
@@ -242,6 +243,8 @@ export function BooksHeader({
   inGroup?: boolean;
   /** Whose a reading list is and who sees it, on a line of its own under the facts. */
   whose?: ReactNode;
+  /** More facts, each a `Fact`, after who made the books. */
+  facts?: ReactNode;
   /** The menu of what can be done with the books, beside the way to go on. */
   menu: ReactNode;
   /** The way back up to what holds the page, above everything else. */
@@ -302,22 +305,22 @@ export function BooksHeader({
           ) : null}
           <Reading read={read} />
           {summary ? <Summary text={summary.text} from={summary.book} /> : null}
-          {writers.length > 0 || pencillers.length > 0 ? (
-            <Facts className="mt-6">
-              <Credit
-                job={["Writer", "Writers"]}
-                by="writer"
-                people={writers}
-                libraryId={libraryId}
-              />
-              <Credit
-                job={["Penciller", "Pencillers"]}
-                by="penciller"
-                people={pencillers}
-                libraryId={libraryId}
-              />
-            </Facts>
-          ) : null}
+          {/* Each fact shows only when there is something to say; with none, nothing does. */}
+          <Facts className="mt-6 empty:hidden">
+            <Credit
+              job={["Writer", "Writers"]}
+              by="writer"
+              people={writers}
+              libraryId={libraryId}
+            />
+            <Credit
+              job={["Penciller", "Pencillers"]}
+              by="penciller"
+              people={pencillers}
+              libraryId={libraryId}
+            />
+            {facts}
+          </Facts>
         </div>
       </div>
     </header>
