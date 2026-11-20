@@ -384,10 +384,11 @@ Decided while building it:
   After a lost key, releases stay signed with the spare; a new key reaches
   a server only with a newer binary or image.
 
-Not yet, in order: opening the repository, since a server fetches
-releases without signing in; a release that carries the button; and the
-release after it, which is the first a server can be brought to with the
-button.
+The repository was opened on 2026-11-19, since a server fetches releases
+without signing in. Release 0.2.0 is the first that carries the button.
+
+Not yet: the release after it, which is the first a server can be brought
+to with the button.
 
 **Done when:** the server on the NAS is brought to a new release with the
 button.
