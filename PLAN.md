@@ -393,6 +393,10 @@ be brought to with the button.
 **Done when:** the server on the NAS is brought to a new release with the
 button.
 
+Done on 2026-11-19: the server on the NAS went from 0.2.0 to 0.2.1 with the
+button, in the same container. The page said nothing clear afterwards, so
+it now says that the server was updated.
+
 Also built here (2026-11-17), ahead of the AI work it is for: import and
 the layout from the database
 ([ADR 0012](docs/adr/0012-series-and-groups-are-a-layout-over-the-files.md)).

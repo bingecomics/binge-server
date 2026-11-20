@@ -66,23 +66,24 @@ function DatabaseCopies() {
   );
 }
 
-/**
- * The server's own updates: whether a newer version is out, and the button that brings the
- * server to it. The server fetches the version, makes sure it is Binge's, and starts again as
- * it. The owner's to see.
- */
 /** What the last look for a new version found, when it found none. */
 function looked(status: UpdateStatus) {
   if (status.looked_at == null) {
-    return "The server has not looked for a new version since it started.";
+    // It has not looked since it started, which is nothing to worry anyone with.
+    return `This server runs ${status.version}.`;
   }
   const when = `Looked ${moment(status.looked_at)}.`;
   return status.problem ? when : `This is the newest version. ${when}`;
 }
 
+/**
+ * The server's own updates: whether a newer version is out, and the button that brings the
+ * server to it. The server fetches the version, makes sure it is Binge's, and starts again as
+ * it. The owner's to see.
+ */
 function Updates() {
   const update = useServerUpdate();
-  const { status, updating } = update;
+  const { status, updating, updated } = update;
   const newer = status?.newer;
   const cannot = status?.cannot;
   const busy = updating != null || update.look.isPending || update.setLooks.isPending;
@@ -135,7 +136,20 @@ function Updates() {
           )}
         </>
       ) : (
-        <p className="text-fg-muted">{looked(status)}</p>
+        <>
+          {updated ? (
+            <p role="status">
+              <span className="font-semibold">Updated to {updated.version}.</span>{" "}
+              <a className={textLinkClass} href={updated.notes} target="_blank" rel="noreferrer">
+                What changed
+              </a>
+            </p>
+          ) : null}
+          {/* Right after an update, the version it runs has just been said. */}
+          {updated && status.looked_at == null ? null : (
+            <p className="text-fg-muted">{looked(status)}</p>
+          )}
+        </>
       )}
       {status && cannot ? (
         <p className="mt-3 text-fg-muted text-metadata">{cannot.message}</p>

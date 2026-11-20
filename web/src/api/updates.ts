@@ -24,6 +24,42 @@ export function useUpdateStatus(asked = true) {
   return useQuery({ ...STATUS, enabled: asked, staleTime: GOOD_FOR });
 }
 
+/** A version the server was brought to, and the page that says what changed in it. */
+export type Updated = { version: string; notes: string };
+
+/** Where the version an update was asked for is kept while the page loads again, in this tab. */
+const ASKED_FOR = "binge.update-asked-for";
+
+function remember(asked: Updated) {
+  try {
+    sessionStorage.setItem(ASKED_FOR, JSON.stringify(asked));
+  } catch {
+    // Storage is blocked: the page will not say that it updated. The version it shows still does.
+  }
+}
+
+/** The version this tab asked the server to update to before the page loaded again. */
+function remembered(): Updated | null {
+  try {
+    const kept: unknown = JSON.parse(sessionStorage.getItem(ASKED_FOR) ?? "null");
+    if (kept && typeof kept === "object" && "version" in kept && "notes" in kept) {
+      const { version, notes } = kept;
+      return typeof version === "string" && typeof notes === "string" ? { version, notes } : null;
+    }
+  } catch {
+    // Blocked, or not what was kept: nothing to say.
+  }
+  return null;
+}
+
+function forget() {
+  try {
+    sessionStorage.removeItem(ASKED_FOR);
+  } catch {
+    // Nothing was kept then.
+  }
+}
+
 /**
  * The server's updates, for the page that manages them: where they stand, looking for a newer
  * version, having the server look every day, and bringing the server to the newer one.
@@ -31,13 +67,16 @@ export function useUpdateStatus(asked = true) {
  * An update is followed to its end here. The server fetches the version, then starts again as it,
  * and does not answer for a moment while it does. When the version that answers is another than
  * the one the update was asked of, the page is loaded again, because the web app is part of the
- * server and is the old one until then. When the same version answers, the server says why in
- * `problem` or `not_started`.
+ * server and is the old one until then. The page that loads then says once that the server was
+ * updated. When the same version answers, the server says why in `problem` or `not_started`.
  */
 export function useServerUpdate() {
   const queryClient = useQueryClient();
   // The version that ran when the update was asked for, while it is followed.
   const [from, setFrom] = useState<string | null>(null);
+  // What this tab asked for before the page loaded again. It is said once: gone on the next load.
+  const [askedFor] = useState(remembered);
+  useEffect(forget, []);
 
   const status = useQuery({
     ...STATUS,
@@ -63,6 +102,9 @@ export function useServerUpdate() {
     onSuccess: async (answer) => {
       // An answer asked for before this one would say that nothing is under way.
       await queryClient.cancelQueries({ queryKey: UPDATE });
+      if (answer.newer) {
+        remember(answer.newer);
+      }
       setFrom(answer.version);
       keep(answer);
     },
@@ -91,6 +133,8 @@ export function useServerUpdate() {
     /** What went wrong asking the server, as distinct from what the server says went wrong. */
     error: from == null ? (status.error ?? look.error ?? setLooks.error ?? start.error) : null,
     updating,
+    /** The version the server was just brought to from this tab, when it is the one that runs. */
+    updated: askedFor && askedFor.version === now?.version ? askedFor : null,
     look,
     setLooks,
     start,
