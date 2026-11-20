@@ -1,0 +1,39 @@
+[package]
+name = "binge-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+argon2 = "0.6.0"
+blake3 = "1.8.7"
+crc32fast = "1.5.0"
+getrandom = "0.4.3"
+hayro = "0.9.0"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp", "gif"] }
+# `encryption` is there to tell a protected archive from a broken one; the
+# server never has a password to try.
+rars = { version = "0.12.4", default-features = false, features = ["encryption"] }
+roxmltree = "0.21.2"
+sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "sqlite", "migrate", "macros"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt", "sync", "fs", "macros", "time"] }
+tracing = "0.1.44"
+unicode-normalization = "0.1.25"
+walkdir = "2.5.0"
+zip = { version = "9.6.0", default-features = false, features = ["deflate"] }
+
+[features]
+# Generated test comics, for other crates' tests. Writing a CBR needs the
+# rar writer.
+fixtures = ["rars/write"]
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+rars = { version = "0.12.4", default-features = false, features = ["write"] }
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }

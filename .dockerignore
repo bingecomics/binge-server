@@ -1,0 +1,13 @@
+# Only what the build reads goes to Docker. Never the development data
+# directory, which holds a real database.
+*
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!crates
+!migrations
+!web
+web/node_modules
+web/out/dist
+web/.tanstack
+**/.DS_Store

@@ -1,0 +1,67 @@
+//! Binge's domain logic: storage, accounts, libraries, scanning, reading and
+//! progress.
+//!
+//! Nothing in this crate knows about HTTP, so the web API and the future MCP
+//! server can both sit on top of it.
+
+pub mod accounts;
+mod archive;
+pub mod backup;
+pub mod catalog;
+pub mod cbl;
+pub mod changes;
+pub mod comicinfo;
+mod covers;
+pub mod db;
+pub mod history;
+mod import;
+pub mod kept;
+pub mod layout;
+pub mod lists;
+pub mod narrow;
+mod natural;
+pub mod overview;
+pub mod people;
+pub mod reading;
+pub mod scan;
+pub mod search;
+mod settings;
+mod thumbnail;
+pub mod views;
+
+#[cfg(any(test, feature = "fixtures"))]
+pub mod fixtures;
+
+pub use accounts::{Account, AccountError, Accounts, ApiToken, User, UserId};
+pub use backup::{BackupError, Backups, COPIES_KEPT, DatabaseCopy};
+pub use catalog::{
+    Book, Catalog, CatalogError, Group, GroupKind, HeldFile, Library, PartOf, Series, Span,
+};
+pub use cbl::{CblEntry, CblFound, CblHow, CblLine, CblPlan, CblRuleFor};
+pub use changes::{ChangeKind, ScanChange, ScanRecord};
+pub use comicinfo::ComicInfo;
+pub use covers::{CoverFrom, CoverOf};
+pub use db::{Database, DbError};
+pub use history::{ReadWriter, ReadingDay, ReadingMonth, ReadingNow, ReadingYear};
+pub use kept::KeptPage;
+pub use layout::Place;
+pub use lists::{ReadingList, ReadingListOverview};
+pub use narrow::{
+    Choice, Choices, Letter, Named, NamedPerson, Narrowing, ReadState, SeriesOrder, SeriesSort,
+    Years,
+};
+pub use overview::{
+    After, BooksOverview, Followed, GroupOverview, ReadSoFar, SeriesOverview, Summary,
+};
+pub use people::{Credited, Credits, Person, PersonName};
+pub use reading::{BooksToMark, Page, PageImage, Progress};
+pub use scan::{ScanPhase, ScanStatus};
+pub use search::Found;
+pub use views::{NewView, View, ViewChange};
+
+/// What to tell a person when the server failed in a way that is not theirs
+/// to fix. What went wrong goes to the log.
+pub const FAILED_FOR_PEOPLE: &str = "The server could not do that. Its log has the details.";
+
+/// Version shared by every crate in the workspace.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+/*
+ * Colors, radii and type sizes are Binge's design tokens, the same ones the
+ * iOS and Android readers use (design/tokens.json in the reader repository).
+ */
+/* The face of the name "BINGE", as in the readers. Its licence is beside it. */
+@font-face {
+  font-family: "Bangers";
+  src: url("./fonts/Bangers-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  /* The name waits for its face rather than showing in another one first. */
+  font-display: block;
+}
+
+/* A window wide enough for the slider that sizes the covers, in the bar at
+   the top. The slider shows there, and only there do the covers follow it. */
+/* While cards are picked on the page: the bar of what is selected says so
+   on the root element. */
+@custom-variant picking (:root[data-picking] &);
+
+@custom-variant with-cover-slider {
+  @variant lg {
+    @slot;
+  }
+}
+
+:root {
+  color-scheme: light dark;
+  --bg: #f7f5f0;
+  --surface: #ffffff;
+  --raised: #ede9e2;
+  --fg: #1c2025;
+  --fg-muted: #555d68;
+  --accent: #805015;
+  --on-accent: #ffffff;
+  --outline: #737b86;
+  --divider: #d8d5ce;
+  --success: #216c48;
+  --danger: #ad2d30;
+  /* The space between a page and the edges of its window. */
+  --gutter: 1rem;
+  /* How wide a cover is in a grid at its narrowest, until another width is
+     chosen with the slider in the bar at the top (coverSize.ts). A window
+     without room for the slider keeps this one. */
+  --cover-unchosen: 8.5rem;
+  --cover: var(--cover-unchosen);
+
+  @variant md {
+    --gutter: 3rem;
+  }
+  @variant with-cover-slider {
+    --cover: var(--cover-chosen, var(--cover-unchosen));
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121416;
+    --surface: #1c1f23;
+    --raised: #282d32;
+    --fg: #f4f1eb;
+    --fg-muted: #b4b7bc;
+    --accent: #f0b76b;
+    --on-accent: #191511;
+    --outline: #7c838d;
+    --divider: #353b43;
+    --success: #8bd4ad;
+    --danger: #ffa6a0;
+  }
+}
+
+@theme inline {
+  --spacing-gutter: var(--gutter);
+  --spacing-cover: var(--cover);
+  --color-background: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-outline: var(--outline);
+  --color-divider: var(--divider);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+
+  /* The mark's own colours, the same in light and dark. */
+  --color-brand-charcoal: #121416;
+  --color-brand-paper: #f4efe3;
+  --color-brand-amber: #f0b76b;
+
+  --font-wordmark: "Bangers", Impact, sans-serif;
+
+  --radius-cover: 4px;
+  --radius-control: 12px;
+  --radius-card: 16px;
+
+  --text-screen-title: 2.125rem;
+  --text-section-title: 1.375rem;
+  --text-card-title: 1.0625rem;
+  --text-body: 1.0625rem;
+  --text-metadata: 0.9375rem;
+  --text-caption: 0.8125rem;
+  /* The name in the readers' sidebar. */
+  --text-wordmark: 2rem;
+}
+
+/* What is scrolled to, as by the Tab key, stops under the bar at the top. */
+html {
+  scroll-padding-top: 4rem;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

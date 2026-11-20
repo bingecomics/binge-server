@@ -1,0 +1,31 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "binge-dev",
+      "runtimeExecutable": "scripts/dev.sh",
+      "runtimeArgs": [],
+      "port": 5173
+    },
+    {
+      "name": "binge-dev-signed-in",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "BINGE_DEV_AS_TOKEN=1",
+        "scripts/dev.sh"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "binge-server",
+      "runtimeExecutable": "target/release/binge-server",
+      "runtimeArgs": [
+        "--data-dir",
+        "data",
+        "--port",
+        "8686"
+      ],
+      "port": 8686
+    }
+  ]
+}

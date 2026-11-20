@@ -1,0 +1,5 @@
+# Every text file has Unix line endings on every machine, Windows included.
+# The migrations are compiled into the binary and the database remembers
+# their checksums, so a build with other line endings would refuse a
+# database made by this one. The shell scripts need them too.
+* text=auto eol=lf

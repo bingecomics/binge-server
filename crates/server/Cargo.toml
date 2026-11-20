@@ -1,0 +1,33 @@
+[package]
+name = "binge-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+axum = "0.8.9"
+axum-extra = { version = "0.12.6", features = ["query"] }
+binge-core = { path = "../core" }
+clap = { version = "4.6.7", features = ["derive", "env"] }
+directories = "6.0.0"
+rust-embed = { version = "8.14.0", features = ["interpolate-folder-path", "mime-guess"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal", "net", "fs"] }
+tower-http = { version = "0.7.1", features = ["trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+utoipa = "6.0.0"
+utoipa-axum = "0.3.0"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+binge-core = { path = "../core", features = ["fixtures"] }
+http-body-util = "0.1.5"
+tempfile = "3.27.0"
+tower = { version = "0.5.3", features = ["util"] }

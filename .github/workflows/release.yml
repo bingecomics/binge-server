@@ -1,0 +1,301 @@
+# Builds what a release is made of: the binaries for Linux, macOS and Windows
+# and the Docker image.
+#
+# A tag named after the version (v1.2.3) publishes them. A pull request that
+# changes how they are built runs the same builds and publishes nothing, and
+# so does a run started by hand. See docs/releasing.md.
+#
+# Nothing here reads a cache: what is released is built from the sources
+# alone.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .dockerignore
+      - .gitattributes
+      - Dockerfile
+      - rust-toolchain.toml
+      - scripts/build-mark.sh
+      - scripts/package.sh
+      - scripts/sign-macos.sh
+      - scripts/smoke.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  # The same pnpm as the Dockerfile installs.
+  PNPM_VERSION: 10.26.0
+  IMAGE: ghcr.io/${{ github.repository }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mark:
+    name: Version and build mark
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.say.outputs.version }}
+      commit: ${{ steps.say.outputs.commit }}
+      time: ${{ steps.say.outputs.time }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # One mark for every platform, so that all the files of a release say
+      # the same commit and time.
+      - id: say
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::The tag is $GITHUB_REF_NAME, and Cargo.toml says version $version. Its release is tagged v$version."
+            exit 1
+          fi
+          source scripts/build-mark.sh
+          {
+            echo "version=$version"
+            echo "commit=$BINGE_BUILD_COMMIT"
+            echo "time=$BINGE_BUILD_TIME"
+          } >>"$GITHUB_OUTPUT"
+
+  web:
+    name: Web app
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - name: Install pnpm
+        run: npm install --global "pnpm@$PNPM_VERSION"
+      - name: Build
+        run: |
+          pnpm -C web install --frozen-lockfile
+          pnpm -C web build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web
+          path: web/out/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  linux:
+    name: Linux binaries and the image
+    needs: mark
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      # To push the image. Only the steps of a tag use it.
+      packages: write
+    env:
+      VERSION: ${{ needs.mark.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # The Linux binaries are the ones the image runs, taken out of its
+      # build, so a binary that is downloaded also runs inside the image.
+      - name: Build the binaries
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: binary
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            BINGE_BUILD_COMMIT=${{ needs.mark.outputs.commit }}
+            BINGE_BUILD_TIME=${{ needs.mark.outputs.time }}
+          outputs: type=local,dest=target/linux
+      - name: Try the one for this machine
+        run: |
+          chmod +x target/linux/linux_amd64/binge-server
+          scripts/smoke.sh target/linux/linux_amd64/binge-server
+      - name: Pack them
+        run: |
+          scripts/package.sh target/linux/linux_amd64/binge-server "binge-server-$VERSION-linux-x86_64.tar.gz"
+          scripts/package.sh target/linux/linux_arm64/binge-server "binge-server-$VERSION-linux-aarch64.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-linux
+          path: target/dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Sign in to the registry
+        if: github.ref_type == 'tag'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The stages are built already, so this only puts the image together.
+      - name: Build the image, and push it for a tag
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            BINGE_BUILD_COMMIT=${{ needs.mark.outputs.commit }}
+            BINGE_BUILD_TIME=${{ needs.mark.outputs.time }}
+          push: ${{ github.ref_type == 'tag' }}
+          tags: |
+            ${{ env.IMAGE }}:${{ needs.mark.outputs.version }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.version=${{ needs.mark.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+
+  macos:
+    name: macOS binary
+    needs: [mark, web]
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.mark.outputs.version }}
+      BINGE_BUILD_COMMIT: ${{ needs.mark.outputs.commit }}
+      BINGE_BUILD_TIME: ${{ needs.mark.outputs.time }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web
+          path: web/out/dist
+      - name: Install the Rust version the project names
+        run: |
+          rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" \
+            --profile minimal --target aarch64-apple-darwin,x86_64-apple-darwin
+      # One binary that runs on both kinds of Mac.
+      - name: Build
+        run: |
+          test -f web/out/dist/index.html
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            cargo build --release --locked --package binge-server --target "$target"
+          done
+          mkdir -p target/universal
+          lipo -create -output target/universal/binge-server \
+            target/aarch64-apple-darwin/release/binge-server \
+            target/x86_64-apple-darwin/release/binge-server
+          lipo -info target/universal/binge-server
+      - name: Try it
+        run: scripts/smoke.sh target/universal/binge-server
+      - name: Sign and notarize, for a tag
+        if: github.ref_type == 'tag'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER: ${{ secrets.MACOS_NOTARY_ISSUER }}
+        run: scripts/sign-macos.sh target/universal/binge-server
+      - name: Pack it
+        run: scripts/package.sh target/universal/binge-server "binge-server-$VERSION-macos.tar.gz"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-macos
+          path: target/dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  windows:
+    name: Windows binary
+    needs: [mark, web]
+    runs-on: windows-2025
+    timeout-minutes: 90
+    env:
+      VERSION: ${{ needs.mark.outputs.version }}
+      BINGE_BUILD_COMMIT: ${{ needs.mark.outputs.commit }}
+      BINGE_BUILD_TIME: ${{ needs.mark.outputs.time }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web
+          path: web/out/dist
+      - name: Install the Rust version the project names
+        run: |
+          rustup toolchain install "$(sed -n 's/^channel = "\(.*\)"/\1/p' rust-toolchain.toml)" \
+            --profile minimal
+      - name: Build
+        run: |
+          test -f web/out/dist/index.html
+          cargo build --release --locked --package binge-server
+      - name: Try it
+        run: scripts/smoke.sh target/release/binge-server.exe
+      # Not signed: Windows warns about it the first time it is run.
+      - name: Pack it
+        run: scripts/package.sh target/release/binge-server.exe "binge-server-$VERSION-windows-x86_64.zip"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-windows
+          path: target/dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  files:
+    name: The files of the release
+    needs: [linux, macos, windows]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: files
+          merge-multiple: true
+      - name: Write their checksums
+        working-directory: files
+        run: |
+          sha256sum binge-server-* >SHA256SUMS
+          cat SHA256SUMS
+          ls -l
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: files
+          path: files/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish
+    if: github.ref_type == 'tag'
+    needs: [mark, files]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: files
+          path: files
+      - name: Make the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.mark.outputs.version }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" files/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Binge Server $VERSION" \
+            --generate-notes --verify-tag

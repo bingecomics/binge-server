@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <title>Binge</title>
+  <!-- The Binge mark at favicon scale: the same tile, frame and play triangle as the mark in the app
+       (BingeMark.tsx), but the halftone dots become a solid fill and the strokes get heavier so it still
+       reads at 16 px. -->
+  <rect width="1024" height="1024" rx="230" fill="#121416"/>
+  <rect x="96" y="96" width="832" height="832" rx="150" fill="none" stroke="#F4EFE3" stroke-width="72"/>
+  <path d="M 330 262 L 772 512 L 330 762 Z" fill="#F0B76B" stroke="#F4EFE3" stroke-width="56" stroke-linejoin="round"/>
+</svg>
