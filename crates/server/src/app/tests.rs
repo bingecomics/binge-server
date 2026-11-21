@@ -2707,6 +2707,26 @@ async fn a_collection_holds_series_and_is_its_makers_to_share() {
         collection["id"]
     );
     assert_eq!(server.get(&at).await.status, StatusCode::NOT_FOUND);
+    // Its maker makes it a row on Home, and it is one for whoever sees it.
+    // Nobody else says so.
+    assert_eq!(collection["on_home"], false);
+    let on_home = format!("{at}/on-home");
+    let refused = cleo.put(&on_home, json!({ "on_home": true })).await;
+    assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "not hers");
+    let put = ben.put(&on_home, json!({ "on_home": true })).await;
+    assert_eq!(put.status, StatusCode::OK);
+    assert_eq!(put.json()["on_home"], true);
+    assert_eq!(cleo.get(&at).await.json()["on_home"], true);
+    let rows = format!("{collections}?on_home=true");
+    assert_eq!(cleo.get(&rows).await.json()[0]["id"], collection["id"]);
+    let first = ben.get(&format!("{series}?limit=1")).await.json();
+    assert_eq!(first.as_array().unwrap().len(), 1);
+    assert_eq!(first[0], ben.get(&series).await.json()[0]);
+    let gone = server.put(&on_home, json!({ "on_home": true })).await;
+    assert_refused(&gone, StatusCode::NOT_FOUND, "not_found", "not shown");
+    let off = ben.put(&on_home, json!({ "on_home": false })).await;
+    assert_eq!(off.json()["on_home"], false);
+    assert_eq!(cleo.get(&rows).await.json(), json!([]));
     // It is said with the series she reads, and found by its name. A
     // series she may not read is not there for her to ask about.
     let of_manga = format!("/api/v1/series/{manga_series}/collections");
@@ -3490,135 +3510,6 @@ async fn people_are_found_seen_whole_and_made_one() {
     assert_eq!(found["people"], json!([]));
     let missing = server.get("/api/v1/people/999").await;
     assert_refused(&missing, StatusCode::NOT_FOUND, "not_found", "nobody");
-}
-
-#[tokio::test]
-async fn a_view_made_with_a_token_is_seen_by_who_reads_the_library() {
-    let server = server().await;
-    for (seed, path, publisher, year) in [
-        (1, "Sandman/Sandman 001.cbz", "Vertigo", "1991"),
-        (2, "Saga/Saga 001.cbz", "Image", "2012"),
-    ] {
-        fixtures::write_tagged_book(
-            &server.comics.join(path),
-            seed,
-            &[("Publisher", publisher), ("Year", year)],
-        );
-    }
-    let library = server.add_library().await;
-    let other = server.add_second_library("Other").await;
-    server.add_user("Ben", &[library]).await;
-    server.add_user("Eve", &[other]).await;
-    assert!(
-        server
-            .get("/api/v1/views")
-            .await
-            .json()
-            .as_array()
-            .unwrap()
-            .is_empty()
-    );
-
-    // An AI client asks with a token of the owner's, as any app does.
-    let (_, secret) = server.make_token("AI client").await;
-    let client = server.with_token(&secret);
-    let asked = json!({ "sort": "year", "publisher": ["Vertigo"], "year": ["1990s"], "not_read": ["read"] });
-    let new = json!({ "library_id": library, "name": " Nineties Vertigo ", "asked": asked, "on_home": true });
-    let made = client.post("/api/v1/views", new).await;
-    assert_eq!(made.status, StatusCode::CREATED);
-    let view = made.json();
-    assert_eq!(view["name"], "Nineties Vertigo");
-    assert_eq!(
-        (&view["on_home"], &view["in_menu"]),
-        (&json!(true), &json!(false))
-    );
-    assert_eq!(view["asked"]["sort"], "year");
-    assert_eq!(view["asked"]["publisher"], json!(["Vertigo"]));
-    assert_eq!(view["asked"]["year"], json!(["1990s"]));
-    assert_eq!(view["asked"]["not_read"], json!(["read"]));
-    assert_eq!(view["asked"]["writer"], json!([]));
-    let id = view["id"].as_i64().unwrap();
-
-    // Its series are the library's, asked for the same way.
-    let series = series_at(
-        &server,
-        &format!("/api/v1/libraries/{library}/series?sort=year&publisher=Vertigo&year=1990s&not_read=read"),
-    )
-    .await;
-    assert_eq!(series, ["Sandman"]);
-
-    // Whoever may read the library sees it; nobody else does, and only
-    // the owner changes it.
-    let ben = server.signed_in_as("Ben", PASSWORD).await;
-    let eve = server.signed_in_as("Eve", PASSWORD).await;
-    assert_eq!(ben.get("/api/v1/views").await.json()[0]["id"], id);
-    assert!(
-        eve.get("/api/v1/views")
-            .await
-            .json()
-            .as_array()
-            .unwrap()
-            .is_empty()
-    );
-    let at = format!("/api/v1/views/{id}");
-    let refused = ben.patch(&at, json!({ "in_menu": true })).await;
-    assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "a member");
-    let refused = ben
-        .post(
-            "/api/v1/views",
-            json!({ "library_id": library, "name": "Mine" }),
-        )
-        .await;
-    assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "a member");
-
-    let changed = server
-        .patch(
-            &at,
-            json!({ "in_menu": true, "asked": { "reverse": true } }),
-        )
-        .await;
-    assert_eq!(changed.status, StatusCode::OK);
-    let changed = changed.json();
-    assert_eq!(changed["in_menu"], true);
-    assert_eq!(changed["name"], "Nineties Vertigo");
-    assert_eq!(changed["asked"]["reverse"], true);
-    assert_eq!(changed["asked"]["publisher"], json!([]));
-
-    // What cannot be kept says why.
-    for (new, what) in [
-        (json!({ "library_id": library, "name": "  " }), "no name"),
-        (
-            json!({ "library_id": library, "name": "Odd", "asked": { "year": ["199"] } }),
-            "no year",
-        ),
-    ] {
-        let refused = server.post("/api/v1/views", new).await;
-        assert_refused(&refused, StatusCode::BAD_REQUEST, "invalid_request", what);
-    }
-    let refused = server
-        .post(
-            "/api/v1/views",
-            json!({ "library_id": 99, "name": "Nowhere" }),
-        )
-        .await;
-    assert_refused(&refused, StatusCode::NOT_FOUND, "not_found", "no library");
-
-    assert_eq!(server.delete(&at).await.status, StatusCode::NO_CONTENT);
-    assert_refused(
-        &server.delete(&at).await,
-        StatusCode::NOT_FOUND,
-        "not_found",
-        "gone",
-    );
-    assert!(
-        server
-            .get("/api/v1/views")
-            .await
-            .json()
-            .as_array()
-            .unwrap()
-            .is_empty()
-    );
 }
 
 #[tokio::test]

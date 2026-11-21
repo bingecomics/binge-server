@@ -30,7 +30,6 @@ pub mod search;
 mod settings;
 pub mod sharing;
 mod thumbnail;
-pub mod views;
 pub mod wanted;
 
 #[cfg(any(test, feature = "fixtures"))]
@@ -64,7 +63,6 @@ pub use reading::{BooksToMark, Page, PageImage, Progress};
 pub use scan::{ScanPhase, ScanStatus};
 pub use search::Found;
 pub use sharing::Sharing;
-pub use views::{NewView, View, ViewChange};
 
 /// What to tell a person when the server failed in a way that is not theirs
 /// to fix. What went wrong goes to the log.

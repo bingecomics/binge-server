@@ -48,6 +48,9 @@ pub struct Collection {
     /// Whether the files of a library made it, from a group of series they
     /// name: see [`crate::from_files`].
     pub from_files: bool,
+    /// Whether it is a row on Home, for everyone who sees it. The one whose
+    /// collection it is says so.
+    pub on_home: bool,
 }
 
 /// SQL that holds when the user, `?1`, may see the collection whose id is
@@ -78,7 +81,7 @@ pub(crate) fn collections(rest: &str) -> String {
     format!(
         "SELECT c.id, c.name, c.summary, c.user_id, maker.name AS made_by, \
          c.user_id = ?1 AS mine, c.shared_with_all, \
-         c.from_files IS NOT NULL AS from_files \
+         c.from_files IS NOT NULL AS from_files, c.on_home \
          FROM collection c JOIN user maker ON maker.id = c.user_id WHERE {} {rest}",
         may_see("c.id")
     )
@@ -98,6 +101,7 @@ pub(crate) struct Row {
     mine: bool,
     shared_with_all: bool,
     from_files: bool,
+    on_home: bool,
 }
 
 /// A series of a collection, with the collection it is in.
@@ -130,6 +134,7 @@ impl Collection {
             shared_with_all: row.shared_with_all,
             shared_with,
             from_files: row.from_files,
+            on_home: row.on_home,
         }
     }
 }
@@ -164,6 +169,16 @@ impl Catalog {
     /// The collections `user` may see, in name order.
     pub async fn collections(&self, user: UserId) -> Result<Vec<Collection>, CatalogError> {
         let query = collections(BY_NAME);
+        let rows = sqlx::query_as(&query)
+            .bind(user)
+            .fetch_all(self.db.pool())
+            .await?;
+        self.with_series(user, rows).await
+    }
+
+    /// The collections `user` may see that are rows on Home, in name order.
+    pub async fn collections_on_home(&self, user: UserId) -> Result<Vec<Collection>, CatalogError> {
+        let query = collections(&format!("AND c.on_home {BY_NAME}"));
         let rows = sqlx::query_as(&query)
             .bind(user)
             .fetch_all(self.db.pool())
@@ -250,22 +265,26 @@ impl Catalog {
             .collect())
     }
 
-    /// The series of a collection `user` may read, in name order.
+    /// The series of a collection `user` may read, in name order: all of
+    /// them, or the first `limit`.
     pub async fn series_in_collection(
         &self,
         user: UserId,
         id: i64,
+        limit: Option<u32>,
     ) -> Result<Vec<Series>, CatalogError> {
         // A collection holds series its reader may read whether or not it
         // is shown to them, so that is asked first.
         COLLECTIONS.is_theirs(self.db.pool(), user, id).await?;
         let query = series(
             "AND s.id IN (SELECT cs.series_id FROM collection_series cs \
-             WHERE cs.collection_id = ?2) ORDER BY s.name COLLATE natsort, s.id",
+             WHERE cs.collection_id = ?2) ORDER BY s.name COLLATE natsort, s.id LIMIT ?3",
         );
         Ok(sqlx::query_as(&query)
             .bind(user)
             .bind(id)
+            // SQLite reads a limit below nothing as none.
+            .bind(limit.map_or(-1, i64::from))
             .fetch_all(self.db.pool())
             .await?)
     }
@@ -345,6 +364,26 @@ impl Catalog {
     ) -> Result<Collection, CatalogError> {
         let mut tx = self.db.begin_write().await?;
         COLLECTIONS.share(&mut tx, user, id, sharing).await?;
+        tx.commit().await?;
+        self.collection(user, id).await
+    }
+
+    /// Makes a collection of `user`'s a row on Home, or no longer one. It is
+    /// a row for everyone who sees the collection: where it sits, and
+    /// whether it is put away, is each person's own.
+    pub async fn put_collection_on_home(
+        &self,
+        user: UserId,
+        id: i64,
+        on_home: bool,
+    ) -> Result<Collection, CatalogError> {
+        let mut tx = self.db.begin_write().await?;
+        COLLECTIONS.theirs(&mut *tx, user, id).await?;
+        sqlx::query("UPDATE collection SET on_home = ? WHERE id = ?")
+            .bind(on_home)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
         tx.commit().await?;
         self.collection(user, id).await
     }

@@ -2,6 +2,10 @@
 
 ## Status
 
+Superseded by
+[0025](0025-views-go-and-a-collection-can-be-a-row-on-home.md) on
+2026-11-21: views were removed, and a collection can be a row on Home.
+
 Accepted on 2026-11-18, decided with step W6 of the plan and built the
 same day as routes of the HTTP API and pages of the web app. The MCP tool
 that will make views is not built: an AI client makes one today with the

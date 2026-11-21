@@ -117,20 +117,6 @@ export function askedIn(search: Record<string, unknown>): Asked {
   };
 }
 
-/** Whether two ask for the same series in the same order, whichever page of them. */
-export function sameAsked(one: Asked, other: Asked): boolean {
-  const same = (a: readonly unknown[] = [], b: readonly unknown[] = []) =>
-    a.length === b.length && a.every((value) => b.includes(value));
-  return (
-    one.sort === other.sort &&
-    one.reverse === other.reverse &&
-    one.seed === other.seed &&
-    NARROWED_BY.every(
-      (by) => same(one[by], other[by]) && same(one[`not_${by}`], other[`not_${by}`]),
-    )
-  );
-}
-
 /** Where a value of one thing stands in what is asked. */
 export function standingOf<By extends NarrowedBy>(
   asked: Asked,

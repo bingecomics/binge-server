@@ -6,10 +6,10 @@
 //! change does exactly what was asked or is refused with the reason.
 
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
@@ -25,6 +25,7 @@ pub(super) fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(collections, create))
         .routes(routes!(collection, change, delete))
         .routes(routes!(share))
+        .routes(routes!(put_on_home))
         .routes(routes!(series, add_series))
         .routes(routes!(remove_series))
         .routes(routes!(collections_of_series))
@@ -65,6 +66,10 @@ pub struct Collection {
     /// deletes it. The files go on putting the series that name the group
     /// in it.
     pub from_files: bool,
+    /// Whether it is a row on Home, for everyone who sees it. The one whose
+    /// collection it is says so. Where the row sits, and whether it is put
+    /// away, is each person's own: see `home.rows` in the settings.
+    pub on_home: bool,
 }
 
 impl From<binge_core::Collection> for Collection {
@@ -87,6 +92,7 @@ impl From<binge_core::Collection> for Collection {
                 .map(UserName::from)
                 .collect(),
             from_files: collection.from_files,
+            on_home: collection.on_home,
         }
     }
 }
@@ -117,6 +123,13 @@ pub struct CollectionDetails {
     pub summary: Option<String>,
 }
 
+/// Whether a collection is a row on Home from now on.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OnHome {
+    pub on_home: bool,
+}
+
 /// Some series, by their ids.
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -131,6 +144,23 @@ pub struct SeriesAdded {
     pub series: u64,
 }
 
+/// Which collections to list.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct Which {
+    /// Only the ones that are rows on Home.
+    #[serde(default)]
+    pub on_home: bool,
+}
+
+/// How many series of a collection to answer with.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct First {
+    /// How many, from the first by name. All of them when left out.
+    pub limit: Option<u32>,
+}
+
 /// Lists the collections the caller sees, in name order: their own, and the
 /// ones shared with them or with everyone. A collection of someone else's
 /// that holds no series the caller may read is left out.
@@ -139,13 +169,18 @@ pub struct SeriesAdded {
     path = "/collections",
     tag = "collections",
     operation_id = "listCollections",
+    params(Which),
     responses((status = OK, body = [Collection]))
 )]
 async fn collections(
     State(state): State<AppState>,
     caller: Caller,
+    Query(which): Query<Which>,
 ) -> Result<Json<Vec<Collection>>, ApiError> {
-    let collections = state.catalog.collections(caller.user.id).await?;
+    let collections = match which.on_home {
+        true => state.catalog.collections_on_home(caller.user.id).await?,
+        false => state.catalog.collections(caller.user.id).await?,
+    };
     Ok(Json(
         collections.into_iter().map(Collection::from).collect(),
     ))
@@ -274,6 +309,37 @@ async fn share(
     Ok(Json(collection.into()))
 }
 
+/// Makes a collection a row on Home, or no longer one. Only the one whose
+/// collection it is can. It is a row for everyone who sees the collection,
+/// with the series they may read: a collection shared with everyone is a
+/// row on everyone's Home. Each person puts the row where they want it, or
+/// away.
+#[utoipa::path(
+    put,
+    path = "/collections/{id}/on-home",
+    tag = "collections",
+    operation_id = "putCollectionOnHome",
+    params(("id" = i64, Path, description = "The collection")),
+    request_body = OnHome,
+    responses(
+        (status = OK, body = Collection),
+        (status = FORBIDDEN, description = "The collection is someone else's", body = ApiError),
+        (status = NOT_FOUND, body = ApiError),
+    )
+)]
+async fn put_on_home(
+    State(state): State<AppState>,
+    caller: Caller,
+    Path(id): Path<i64>,
+    Json(row): Json<OnHome>,
+) -> Result<Json<Collection>, ApiError> {
+    let collection = state
+        .catalog
+        .put_collection_on_home(caller.user.id, id, row.on_home)
+        .await?;
+    Ok(Json(collection.into()))
+}
+
 /// Deletes a collection. Its series are not touched. Only the one whose
 /// collection it is can.
 #[utoipa::path(
@@ -303,17 +369,18 @@ async fn delete(
     path = "/collections/{id}/series",
     tag = "collections",
     operation_id = "listCollectionSeries",
-    params(("id" = i64, Path, description = "The collection")),
+    params(("id" = i64, Path, description = "The collection"), First),
     responses((status = OK, body = [Series]), (status = NOT_FOUND, body = ApiError))
 )]
 async fn series(
     State(state): State<AppState>,
     caller: Caller,
     Path(id): Path<i64>,
+    Query(first): Query<First>,
 ) -> Result<Json<Vec<Series>>, ApiError> {
     let series = state
         .catalog
-        .series_in_collection(caller.user.id, id)
+        .series_in_collection(caller.user.id, id, first.limit)
         .await?;
     Ok(Json(series.into_iter().map(Series::from).collect()))
 }

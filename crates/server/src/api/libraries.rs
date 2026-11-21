@@ -320,7 +320,7 @@ async fn scan(
 }
 
 /// What a library's series are ordered by.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SeriesSort {
     /// By name, from A.
@@ -351,21 +351,8 @@ impl From<SeriesSort> for binge_core::SeriesSort {
     }
 }
 
-impl From<binge_core::SeriesSort> for SeriesSort {
-    fn from(sort: binge_core::SeriesSort) -> Self {
-        match sort {
-            binge_core::SeriesSort::Name => Self::Name,
-            binge_core::SeriesSort::Added => Self::Added,
-            binge_core::SeriesSort::Year => Self::Year,
-            binge_core::SeriesSort::LastRead => Self::LastRead,
-            binge_core::SeriesSort::Unread => Self::Unread,
-            binge_core::SeriesSort::Random => Self::Random,
-        }
-    }
-}
-
 /// How far the caller is through a series.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema)]
+#[derive(Clone, Copy, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ReadState {
     /// They opened none of its books.
@@ -386,24 +373,14 @@ impl From<ReadState> for binge_core::ReadState {
     }
 }
 
-impl From<binge_core::ReadState> for ReadState {
-    fn from(state: binge_core::ReadState) -> Self {
-        match state {
-            binge_core::ReadState::Unread => Self::Unread,
-            binge_core::ReadState::InProgress => Self::InProgress,
-            binge_core::ReadState::Read => Self::Read,
-        }
-    }
-}
-
 /// Which series of a library, and in what order: what
-/// `GET /libraries/{id}/series` takes, and what a view keeps. A series is
-/// narrowed by what its books say: it is of a publisher, a year or a person
-/// when one of its books is. Each thing to narrow by can be given several
-/// times: a series stays when it has one of the values asked for, and none
-/// of those ruled out with `not_`. It has to pass every kind of narrowing
-/// given, and what is left out is not narrowed by.
-#[derive(Debug, Default, Deserialize, Serialize, ToSchema, IntoParams)]
+/// `GET /libraries/{id}/series` takes. A series is narrowed by what its
+/// books say: it is of a publisher, a year or a person when one of its
+/// books is. Each thing to narrow by can be given several times: a series
+/// stays when it has one of the values asked for, and none of those ruled
+/// out with `not_`. It has to pass every kind of narrowing given, and what
+/// is left out is not narrowed by.
+#[derive(Debug, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub struct Asked {
     /// What to order the series by. By name when left out. Series the order
@@ -448,7 +425,7 @@ pub struct Asked {
 }
 
 impl Asked {
-    pub(super) fn order(&self) -> SeriesOrder {
+    fn order(&self) -> SeriesOrder {
         SeriesOrder {
             sort: self.sort.into(),
             reverse: self.reverse,
@@ -456,7 +433,7 @@ impl Asked {
         }
     }
 
-    pub(super) fn narrowing(self) -> Result<Narrowing, ApiError> {
+    fn narrowing(self) -> Result<Narrowing, ApiError> {
         let years = |written: Vec<String>| -> Result<Vec<Years>, ApiError> {
             let read = written.iter().map(|years| Years::parse(years));
             Ok(read.collect::<Result<_, _>>()?)
@@ -484,36 +461,6 @@ impl Asked {
                 ruled_out: self.not_penciller,
             },
         })
-    }
-
-    /// What was asked for, written the way it is asked for.
-    pub(super) fn of(order: SeriesOrder, narrowing: Narrowing) -> Self {
-        let states =
-            |states: Vec<binge_core::ReadState>| states.into_iter().map(Into::into).collect();
-        let written = |years: Vec<Years>| years.into_iter().map(Years::written).collect();
-        // Named one by one, so that a new thing to narrow by is not left out.
-        let Narrowing {
-            read,
-            publishers,
-            years,
-            writers,
-            pencillers,
-        } = narrowing;
-        Self {
-            sort: order.sort.into(),
-            reverse: order.reverse,
-            seed: order.seed,
-            read: states(read.asked),
-            not_read: states(read.ruled_out),
-            publisher: publishers.asked,
-            not_publisher: publishers.ruled_out,
-            year: written(years.asked),
-            not_year: written(years.ruled_out),
-            writer: writers.asked,
-            not_writer: writers.ruled_out,
-            penciller: pencillers.asked,
-            not_penciller: pencillers.ruled_out,
-        }
     }
 }
 

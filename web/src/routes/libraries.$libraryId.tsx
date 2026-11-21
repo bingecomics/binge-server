@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Bookmark, Copy, FolderSearch, History, RefreshCw, Tags, Trash2 } from "lucide-react";
+import { Copy, FolderSearch, History, RefreshCw, Tags, Trash2 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { useIsOwner } from "../api/account";
 import type { Book } from "../api/client";
@@ -29,7 +29,6 @@ import { rowClass } from "../components/Section";
 import { SeriesCard } from "../components/SeriesCard";
 import { shelfTitleClass } from "../components/Shelf";
 import { ErrorText, textLinkClass } from "../components/text";
-import { ViewDialog } from "../components/ViewDialog";
 import { contents, count, moment } from "../format";
 import { askedIn, narrowedBy, onPage, SERIES_A_PAGE, unnarrowed } from "../narrowing";
 
@@ -62,8 +61,6 @@ const LibraryContents = memo(function LibraryContents({
   scanning: boolean;
 }) {
   const asked = Route.useSearch();
-  const isOwner = useIsOwner();
-  const [keeping, setKeeping] = useState(false);
   const series = useSeriesPage(libraryId, asked);
   // The letters are those of the names, so they are for the order of the names.
   const byName = asked.sort === undefined;
@@ -112,26 +109,7 @@ const LibraryContents = memo(function LibraryContents({
   const link = { to: "/libraries/$libraryId", params: { libraryId } } as const;
   return (
     <>
-      <Narrowing
-        libraryId={libraryId}
-        asked={asked}
-        shown={total}
-        of={seriesCount}
-        // Keeping what is asked under a name is the owner's to do.
-        action={
-          isOwner ? (
-            <Button onClick={() => setKeeping(true)}>
-              <Bookmark className="size-4 text-fg-muted" aria-hidden="true" />
-              Keep view
-            </Button>
-          ) : null
-        }
-      />
-      <ViewDialog
-        open={keeping}
-        onClose={() => setKeeping(false)}
-        library={{ id: libraryId, asked }}
-      />
+      <Narrowing libraryId={libraryId} asked={asked} shown={total} of={seriesCount} />
       {byName && letters.data && (total ?? 0) >= ENOUGH_FOR_LETTERS ? (
         <LetterBar
           libraryId={libraryId}

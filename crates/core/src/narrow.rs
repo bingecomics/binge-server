@@ -46,33 +46,6 @@ pub enum SeriesSort {
     Random,
 }
 
-impl SeriesSort {
-    const ALL: [Self; 6] = [
-        Self::Name,
-        Self::Added,
-        Self::Year,
-        Self::LastRead,
-        Self::Unread,
-        Self::Random,
-    ];
-
-    /// The order as it is written where one is kept.
-    pub(crate) fn kept(self) -> &'static str {
-        match self {
-            Self::Name => "name",
-            Self::Added => "added",
-            Self::Year => "year",
-            Self::LastRead => "last_read",
-            Self::Unread => "unread",
-            Self::Random => "random",
-        }
-    }
-
-    pub(crate) fn read(kept: &str) -> Option<Self> {
-        Self::ALL.into_iter().find(|sort| sort.kept() == kept)
-    }
-}
-
 /// The order a library's series are asked for in.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SeriesOrder {
@@ -93,23 +66,6 @@ pub enum ReadState {
     InProgress,
     /// They read every book of it.
     Read,
-}
-
-impl ReadState {
-    /// The state as it is written where one is kept.
-    pub(crate) fn kept(self) -> &'static str {
-        match self {
-            Self::Unread => "unread",
-            Self::InProgress => "in_progress",
-            Self::Read => "read",
-        }
-    }
-
-    pub(crate) fn read(kept: &str) -> Option<Self> {
-        [Self::Unread, Self::InProgress, Self::Read]
-            .into_iter()
-            .find(|state| state.kept() == kept)
-    }
 }
 
 /// The years a series is asked to have a book from.
@@ -141,14 +97,6 @@ impl Years {
             true if year % 10 == 0 => Ok(Self::Decade(year)),
             true => Err(invalid),
             false => Ok(Self::Year(year)),
-        }
-    }
-
-    /// The years as [`Self::parse`] reads them.
-    pub fn written(self) -> String {
-        match self {
-            Self::Year(year) => year.to_string(),
-            Self::Decade(first) => format!("{first}s"),
         }
     }
 

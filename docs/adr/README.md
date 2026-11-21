@@ -22,7 +22,7 @@ it, so nobody has to guess later or reopen it by accident.
 | [0014](0014-reading-lists-belong-to-the-server.md) | Reading lists belong to the server | Superseded by 0021 |
 | [0015](0015-long-lists-are-read-a-part-at-a-time.md) | Long lists are read a part at a time | Accepted |
 | [0016](0016-a-person-is-the-names-they-go-by.md) | A person is the names they go by | Accepted |
-| [0017](0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name | Accepted |
+| [0017](0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name | Superseded by 0025 |
 | [0018](0018-what-a-person-chooses-is-kept-as-keys-and-values.md) | What a person chooses is kept as keys and values | Accepted |
 | [0019](0019-the-server-is-under-the-agpl.md) | The server is under the AGPL | Accepted |
 | [0020](0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases | Accepted |
@@ -30,6 +30,7 @@ it, so nobody has to guess later or reopen it by accident.
 | [0022](0022-a-collection-holds-series-and-is-shared-as-a-list-is.md) | A collection holds series, and is shared as a list is | Accepted |
 | [0023](0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md) | Want to read is a person's own, and leaves out what was read | Accepted |
 | [0024](0024-a-library-makes-lists-and-collections-from-what-its-files-say.md) | A library makes lists and collections from what its files say | Accepted |
+| [0025](0025-views-go-and-a-collection-can-be-a-row-on-home.md) | Views go, and a collection can be a row on Home | Accepted |
 
 ## Adding one
 

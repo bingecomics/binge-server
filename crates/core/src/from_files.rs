@@ -527,7 +527,7 @@ mod tests {
         assert!(collection.from_files && collection.shared_with_all);
         let held = shelf
             .catalog
-            .series_in_collection(shelf.owner, collection.id);
+            .series_in_collection(shelf.owner, collection.id, None);
         let held: Vec<String> = held.await.unwrap().into_iter().map(|s| s.name).collect();
         assert_eq!(held, ["Day Watch"]);
     }
@@ -674,11 +674,11 @@ mod tests {
         let collections = catalog.collections(shelf.owner).await.unwrap();
         let city = collections[0].id;
         let held = || async {
-            let series = catalog.series_in_collection(shelf.owner, city);
+            let series = catalog.series_in_collection(shelf.owner, city, None);
             let names = series.await.unwrap().into_iter().map(|one| one.name);
             names.collect::<Vec<_>>()
         };
-        let day_watch = catalog.series_in_collection(shelf.owner, city);
+        let day_watch = catalog.series_in_collection(shelf.owner, city, None);
         let day_watch = day_watch.await.unwrap()[0].id;
         let out = catalog.remove_from_collection(shelf.owner, city, day_watch);
         out.await.unwrap();

@@ -31,7 +31,6 @@ import { Route as SettingsLibrariesRouteImport } from './routes/settings.librari
 import { Route as SettingsServerRouteImport } from './routes/settings.server'
 import { Route as SettingsTokensRouteImport } from './routes/settings.tokens'
 import { Route as SettingsUsersRouteImport } from './routes/settings.users'
-import { Route as SettingsViewsRouteImport } from './routes/settings.views'
 import { Route as LibrariesLibraryIdDuplicatesRouteImport } from './routes/libraries_.$libraryId.duplicates'
 import { Route as LibrariesLibraryIdScansRouteImport } from './routes/libraries_.$libraryId.scans'
 import { Route as SeriesSeriesIdGroupsGroupIdRouteImport } from './routes/series_.$seriesId.groups.$groupId'
@@ -146,11 +145,6 @@ const SettingsUsersRoute = SettingsUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => SettingsRoute,
 } as any)
-const SettingsViewsRoute = SettingsViewsRouteImport.update({
-  id: '/views',
-  path: '/views',
-  getParentRoute: () => SettingsRoute,
-} as any)
 const LibrariesLibraryIdDuplicatesRoute =
   LibrariesLibraryIdDuplicatesRouteImport.update({
     id: '/libraries_/$libraryId/duplicates',
@@ -189,7 +183,6 @@ export interface FileRoutesByFullPath {
   '/settings/server': typeof SettingsServerRoute
   '/settings/tokens': typeof SettingsTokensRoute
   '/settings/users': typeof SettingsUsersRoute
-  '/settings/views': typeof SettingsViewsRoute
   '/collections/': typeof CollectionsIndexRoute
   '/lists/': typeof ListsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -216,7 +209,6 @@ export interface FileRoutesByTo {
   '/settings/server': typeof SettingsServerRoute
   '/settings/tokens': typeof SettingsTokensRoute
   '/settings/users': typeof SettingsUsersRoute
-  '/settings/views': typeof SettingsViewsRoute
   '/collections': typeof CollectionsIndexRoute
   '/lists': typeof ListsIndexRoute
   '/settings': typeof SettingsIndexRoute
@@ -245,7 +237,6 @@ export interface FileRoutesById {
   '/settings/server': typeof SettingsServerRoute
   '/settings/tokens': typeof SettingsTokensRoute
   '/settings/users': typeof SettingsUsersRoute
-  '/settings/views': typeof SettingsViewsRoute
   '/collections/': typeof CollectionsIndexRoute
   '/lists/': typeof ListsIndexRoute
   '/settings/': typeof SettingsIndexRoute
@@ -275,7 +266,6 @@ export interface FileRouteTypes {
     | '/settings/server'
     | '/settings/tokens'
     | '/settings/users'
-    | '/settings/views'
     | '/collections/'
     | '/lists/'
     | '/settings/'
@@ -302,7 +292,6 @@ export interface FileRouteTypes {
     | '/settings/server'
     | '/settings/tokens'
     | '/settings/users'
-    | '/settings/views'
     | '/collections'
     | '/lists'
     | '/settings'
@@ -330,7 +319,6 @@ export interface FileRouteTypes {
     | '/settings/server'
     | '/settings/tokens'
     | '/settings/users'
-    | '/settings/views'
     | '/collections/'
     | '/lists/'
     | '/settings/'
@@ -517,13 +505,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsUsersRouteImport
       parentRoute: typeof SettingsRoute
     }
-    '/settings/views': {
-      id: '/settings/views'
-      path: '/views'
-      fullPath: '/settings/views'
-      preLoaderRoute: typeof SettingsViewsRouteImport
-      parentRoute: typeof SettingsRoute
-    }
     '/libraries_/$libraryId/duplicates': {
       id: '/libraries_/$libraryId/duplicates'
       path: '/libraries/$libraryId/duplicates'
@@ -554,7 +535,6 @@ interface SettingsRouteChildren {
   SettingsServerRoute: typeof SettingsServerRoute
   SettingsTokensRoute: typeof SettingsTokensRoute
   SettingsUsersRoute: typeof SettingsUsersRoute
-  SettingsViewsRoute: typeof SettingsViewsRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
@@ -564,7 +544,6 @@ const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsServerRoute: SettingsServerRoute,
   SettingsTokensRoute: SettingsTokensRoute,
   SettingsUsersRoute: SettingsUsersRoute,
-  SettingsViewsRoute: SettingsViewsRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 

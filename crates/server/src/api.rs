@@ -20,7 +20,6 @@ mod session;
 mod settings;
 mod updates;
 mod users;
-mod views;
 mod wanted;
 
 use axum::body::Bytes;
@@ -63,7 +62,6 @@ const V1: &str = "/v1";
         (name = "lists", description = "Reading lists, and making one from a CBL file"),
         (name = "collections", description = "Collections: series picked by hand, from any library"),
         (name = "people", description = "Who the books name, and the names they go by"),
-        (name = "views", description = "A library narrowed and ordered, kept under a name"),
     )
 )]
 struct ApiDoc;
@@ -110,7 +108,6 @@ fn guarded() -> OpenApiRouter<AppState> {
         .merge(lists::routes())
         .merge(collections::routes())
         .merge(people::routes())
-        .merge(views::routes())
         .merge(wanted::routes())
         .merge(settings::routes())
         .merge(history::routes())

@@ -52,7 +52,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `api/auth.rs` | The check that a request shows who makes it, and the caller the handlers get from it |
 | `api/health.rs`, `api/libraries.rs`, `api/browse.rs`, `api/reading.rs` | The routes for libraries and reading, grouped by what they are about |
 | `api/people.rs` | The routes for the people books name, and for the owner to say who is who |
-| `api/views.rs`, `api/settings.rs` | The routes for the views kept of a library, and for what each person chose in an app |
+| `api/settings.rs` | The routes for what each person chose in an app |
 | `api/history.rs` | The routes for what the caller read, and for the owner to see who reads now |
 | `api/kept.rs` | The routes for the pages the caller kept while reading |
 | `api/scans.rs`, `api/backups.rs` | The owner's routes for what scans changed and files set aside, and for the copies of the database |
@@ -84,7 +84,6 @@ iteration 6 will be a third crate on top of the same core, next to
 | `search.rs` | Finds series, books, reading lists, collections and people by their words |
 | `narrow.rs` | A library's series in an order, narrowed by what their books say, a part at a time |
 | `people.rs` | The people books name, the names they go by, and making two of them one |
-| `views.rs` | A library narrowed and ordered, kept under a name for Home and the menu |
 | `settings.rs` | What each person chose in an app, as keys and values the server does not read |
 | `history.rs` | What someone read, by day, month and writer, who is reading now, and how fast someone reads |
 | `kept.rs` | The pages a reader kept while reading |
@@ -185,8 +184,6 @@ The routes today:
 | `GET /recently-updated`, `GET /recently-added` | The series that got a book last; the newest books |
 | `GET /me/reading?year=` | What the caller read in a year: the days they read on, each month, the writers they read most, and the first year there is anything of |
 | `GET /reading-now` | For the owner: who has turned a page in the last half hour, and of which book |
-| `GET /views`, `POST /views` | The views of the libraries the caller may read; the owner keeps one: a library, an order and a narrowing under a name |
-| `PATCH /views/{id}`, `DELETE /views/{id}` | The owner changes a view's name, what it asks or where it shows; deletes it |
 | `GET /me/settings` | Everything the caller chose in an app, by key |
 | `PUT /me/settings/{key}`, `DELETE` | Keep a value under a key; forget it |
 | `GET /server/backups`, `POST`, `PATCH` | For the owner: the copies of the database and whether one is made every day; make one now; turn the daily copy on or off |
@@ -206,10 +203,11 @@ The routes today:
 | `DELETE /reading-lists/{id}/books/{book_id}` | The one whose list it is takes a book out of it |
 | `PUT /reading-lists/{id}/books/{book_id}/position` | The one whose list it is moves a book of it to a position among the books shown |
 | `GET /books/{id}/reading-lists`, `GET /series/{id}/reading-lists` | The reading lists the caller sees that a book is in; that hold a book of a series |
-| `GET /collections`, `POST /collections` | The collections the caller sees: their own and the ones shared with them; anyone makes one of their own, with series in it or none |
+| `GET /collections?on_home=`, `POST /collections` | The collections the caller sees: their own and the ones shared with them, or only the ones that are rows on Home; anyone makes one of their own, with series in it or none |
 | `GET /collections/{id}`, `PATCH`, `DELETE` | One collection; the one whose it is gives it another name and summary; deletes it |
 | `PUT /collections/{id}/sharing` | The one whose collection it is says who sees it: everyone, the people named, or nobody else |
-| `GET /collections/{id}/series`, `POST` | Its series by name; the one whose collection it is adds series |
+| `PUT /collections/{id}/on-home` | The one whose collection it is makes it a row on Home for everyone who sees it, or no longer one |
+| `GET /collections/{id}/series?limit=`, `POST` | Its series by name, all of them or the first few; the one whose collection it is adds series |
 | `DELETE /collections/{id}/series/{series_id}` | The one whose collection it is takes a series out of it |
 | `GET /series/{id}/collections` | The collections the caller sees that a series is in |
 | `POST /reading-lists/import` | Asks what a CBL file would make: the body is the file. Nothing is made |
@@ -294,7 +292,7 @@ from anywhere. On every page but the settings', a window at least 1024 px
 wide also has a slider there for the size of the covers: one size for every grid
 and row, from 6 to 13 rem, kept by the server for each person
 (`cover-size`, see "What a person chose" below). The menu lists
-Home, My Binge, the views kept for the menu and the libraries. My Binge
+Home, My Binge and the libraries. My Binge
 is one entry for what is a person's own: what they want to read
 (`/want-to-read`, where it opens), the reading lists (`/lists`) and the
 collections (`/collections`) they see, and their favorite pages
@@ -303,10 +301,9 @@ it, and the entry is marked on all of them and on the pages under them.
 In a narrow window the menu of who is signed in leads to it. On a settings page it is the settings' own menu
 instead, a page for each part: `/settings/account`,
 `/settings/tokens`, and for the owner `/settings/users`,
-`/settings/libraries`, `/settings/views` and `/settings/server`. A narrow
+`/settings/libraries` and `/settings/server`. A narrow
 window has no room beside the page: there the settings' menu is a row
-above it, the reading lists, the views of the menu and the libraries
-are reached from Home, and want to read and the collections from the menu
+above it, the libraries are reached from Home, and My Binge from the menu
 of who is signed in.
 
 **Menus and picking several.** Every card of a book, a group, a series or
@@ -847,11 +844,23 @@ library, in no order of their own
   change to someone else's, and who it is shared with.
 - **Cover.** `covers` names those of its first series, four different
   ones at most, and `cover` the first. None is chosen for it.
+- **A row on Home.** `on_home` says the collection is one, for everyone
+  who sees it, and its maker sets it with `PUT
+  /collections/{id}/on-home`
+  ([ADR 0025](adr/0025-views-go-and-a-collection-can-be-a-row-on-home.md)).
+  Where the row sits, and whether it is put away, is each person's: see
+  "What a person chose". It took the place of views, a library's
+  narrowing kept under a name, which were removed.
 
 **In the web app.** `/collections` shows a person's own collections and,
 apart from them, the ones shared with them. `/collections/$collectionId`
 shows one: its series as the cards every page uses, whose it is or who
-sees it, and for the maker the menu that renames, shares and deletes it.
+sees it, and for the maker the menu that renames, shares and deletes it
+and that shows it on Home or takes it off. On Home the row is the
+collection's name over its first 24 series, by name, with the way to all
+of them. Home asks only for the collections that are rows
+(`?on_home=true`) and for the first series of each (`?limit=24`), so the
+rest of a person's collections are not worked out to show it.
 The maker takes a series out from the menu of its card there. "Add to a
 collection…" is in the menu of a series and in the bar of what is picked
 while only series are picked; one dialog, mounted in the frame, asks
@@ -1037,8 +1046,8 @@ shows the same row.
 
 Home shows the four lists in that order, each as one line of covers that
 goes on sideways, with what the person wants to read, the reading lists
-and the views that are rows after "Up next", and the libraries under them
-all. Each person arranges it: the
+and the collections that are rows after "Up next", and the libraries under
+them all. Each person arranges it: the
 order of the rows and which are put away, kept by the server (`home.rows`).
 A row with nothing in it is not shown, and the libraries always end the
 page.
@@ -1094,27 +1103,6 @@ without the bar at the top or the menu beside the page.
   The settings of a series can be made the usual ones or let go. What a
   browser kept before the server did is read until the first change.
 
-### Views
-
-A view is a library in an order and narrowed, kept under a name:
-"Unread Vertigo of the nineties". See
-[ADR 0017](adr/0017-a-view-is-a-library-narrowed-and-kept-by-name.md).
-
-- **The owner's to make, everyone's to see.** `POST /views` takes a
-  library, a name, what is `asked` and where it shows. Whoever may read
-  the library sees the view. An AI client makes one with the owner's API
-  token until the MCP tool exists.
-- **What it asks** has the fields `GET /libraries/{id}/series` takes:
-  `sort`, `reverse`, `seed`, and each thing to narrow by with its `not_`
-  twin. A client shows a view by asking that route with them. A view
-  narrows by 100 values at most.
-- **Where it shows.** `on_home` makes it a row on Home, with its first
-  series and the way to the rest; `in_menu` makes it an entry in the menu
-  beside the page. The web app marks the entry while the library shows
-  exactly what the view asks, on any page of it.
-- **In the web app** the owner keeps what a library's page shows with
-  "Keep view", and changes or deletes views at `/settings/views`.
-
 ### What a person chose
 
 `crates/core/src/settings.rs` keeps, for each person, values under keys
@@ -1126,9 +1114,10 @@ app keeps four: `cover-size`, the size of the covers in rem; `reader` and
 `reader.series`, how the reader shows books, as JSON; and
 `home.rows`, the arrangement of Home as JSON with the `order` of its rows
 and the ones `hidden`. A row is named `continue`, `up-next`,
-`want-to-read`, `lists`, `updated`, `added` or `view:` and a view's id. A row the arrangement does
-not name, as a view made since, comes after the row it would follow by
-itself.
+`want-to-read`, `lists`, `updated`, `added` or `collection:` and the id
+of a collection that is a row on Home. A row the arrangement does not
+name, as a collection put on Home since, comes after the row it would
+follow by itself, and one it names that is no longer there is left out.
 
 ## How it is built and run
 
@@ -1229,14 +1218,13 @@ names. The server listens on `127.0.0.1` unless told otherwise; `--bind
   `reading_list_cover` (the cover chosen for a book identity; for a series;
   for a reading list), `reading_list` (whose it is, a name, a summary and
   whether everyone sees it), `collection`, `collection_series` and
-  `collection_share` (the same for a collection and its series), `reading_list_share` (a person a list is
+  `collection_share` (the same for a collection and its series, and
+  whether it is a row on Home), `reading_list_share` (a person a list is
   shared with), `reading_list_book` (a book identity and its position in
   a list), `cbl_rule` (what a person said an entry of a CBL file means),
   `person` (someone the books name, and the name they are shown by),
   `person_name` (one way of writing a person's name),
   `book_credit` (a book names a spelling as its writer or penciller),
-  `kept_view` and `kept_view_value` (a view: a library, a name, an order
-  and where it shows; one value it asks for or rules out),
   `user_setting` (a value a person keeps under a key),
   `scan_record` and `scan_change` (a scan that changed a library; one
   file it found arrived, back, moved or gone),
@@ -1318,7 +1306,7 @@ Listed here so the parts above make sense. Details are in
 | [0014](adr/0014-reading-lists-belong-to-the-server.md) | Reading lists belong to the server (superseded by 0021) |
 | [0015](adr/0015-long-lists-are-read-a-part-at-a-time.md) | Long lists are read a part at a time |
 | [0016](adr/0016-a-person-is-the-names-they-go-by.md) | A person is the names they go by |
-| [0017](adr/0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name |
+| [0017](adr/0017-a-view-is-a-library-narrowed-and-kept-by-name.md) | A view is a library narrowed, kept by name (superseded by 0025) |
 | [0018](adr/0018-what-a-person-chooses-is-kept-as-keys-and-values.md) | What a person chooses is kept as keys and values |
 | [0019](adr/0019-the-server-is-under-the-agpl.md) | The server is under the AGPL |
 | [0020](adr/0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases |
@@ -1326,3 +1314,4 @@ Listed here so the parts above make sense. Details are in
 | [0022](adr/0022-a-collection-holds-series-and-is-shared-as-a-list-is.md) | A collection holds series, and is shared as a list is |
 | [0023](adr/0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md) | Want to read is a person's own, and leaves out what was read |
 | [0024](adr/0024-a-library-makes-lists-and-collections-from-what-its-files-say.md) | A library makes lists and collections from what its files say |
+| [0025](adr/0025-views-go-and-a-collection-can-be-a-row-on-home.md) | Views go, and a collection can be a row on Home |

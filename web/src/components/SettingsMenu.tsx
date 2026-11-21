@@ -1,5 +1,5 @@
 import { useLocation } from "@tanstack/react-router";
-import { Bookmark, ChevronLeft, KeyRound, Server, UserRound, Users } from "lucide-react";
+import { ChevronLeft, KeyRound, Server, UserRound, Users } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useIsOwner } from "../api/account";
 import { ComicLibraryIcon } from "./ComicLibraryIcon";
@@ -40,7 +40,6 @@ export function SettingsMenu() {
         <p className={`${headingClass} md:mt-5`}>This server</p>
         {isOwner ? <NavLink to="/settings/users" icon={Users} label="Users" /> : null}
         <NavLink to="/settings/libraries" icon={ComicLibraryIcon} label="Libraries" />
-        {isOwner ? <NavLink to="/settings/views" icon={Bookmark} label="Views" /> : null}
         <NavLink to="/settings/server" icon={Server} label="About" />
       </nav>
     </aside>

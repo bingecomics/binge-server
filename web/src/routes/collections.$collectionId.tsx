@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Pencil, Trash2, Users, X } from "lucide-react";
+import { ChevronLeft, House, Pencil, Trash2, Users, X } from "lucide-react";
 import { memo, useState } from "react";
 import { useOthers } from "../api/account";
 import { gotNoAnswer, type Series } from "../api/client";
@@ -8,6 +8,7 @@ import {
   useCollection,
   useCollectionSeries,
   useDeleteCollection,
+  usePutCollectionOnHome,
   useRemoveFromCollection,
   useShareCollection,
 } from "../api/collections";
@@ -85,6 +86,8 @@ function CollectionPage() {
   const [deleting, setDeleting] = useState(false);
   const change = useChangeCollection(collectionId);
   const share = useShareCollection(collectionId);
+  // What goes wrong, and what was done, is said over the page by the hook.
+  const onHome = usePutCollectionOnHome(collectionId);
   const remove = useDeleteCollection(() => navigate({ to: "/collections", replace: true }));
 
   if (found.isPending) {
@@ -105,6 +108,9 @@ function CollectionPage() {
   const canShare = mine && others.length > 0;
   const own = mine ? (
     <>
+      <MenuItem icon={House} onSelect={() => onHome.mutate(!collection.on_home)}>
+        {collection.on_home ? "Take off Home" : "Show on Home"}
+      </MenuItem>
       <MenuItem icon={Pencil} onSelect={() => setEditing(true)}>
         Edit name and summary…
       </MenuItem>

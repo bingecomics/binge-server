@@ -4,9 +4,9 @@
  * under `HOME_ROWS_KEPT_AS`, as JSON, so Home is the same in another
  * browser.
  *
- * A row is named by an id: one of Home's own, or `view:` and the id of a
- * view that is a row on Home. The libraries end the page and are not part
- * of it: a narrow window has no other way to them.
+ * A row is named by an id: one of Home's own, or `collection:` and the id
+ * of a collection that is a row on Home. The libraries end the page and are
+ * not part of it: a narrow window has no other way to them.
  */
 export const HOME_ROWS_KEPT_AS = "home.rows";
 
@@ -17,9 +17,9 @@ export type Arrangement = {
   hidden: string[];
 };
 
-/** The id of the row a view makes. */
-export function viewRow(viewId: number): string {
-  return `view:${viewId}`;
+/** The id of the row a collection makes. */
+export function collectionRow(collectionId: number): string {
+  return `collection:${collectionId}`;
 }
 
 function ids(value: unknown): string[] {
@@ -45,7 +45,7 @@ export function keptAs(arrangement: Arrangement): string {
 /**
  * The rows there are, in the order an arrangement gives them. `rows` come
  * in the order they have by themselves. One the arrangement does not name,
- * as a view made since, goes after the row it follows by itself.
+ * as a collection put on Home since, goes after the row it follows by itself.
  */
 export function arranged<Row extends { id: string }>(rows: Row[], order: string[]): Row[] {
   const placed = (id: string) => rows.find((row) => row.id === id);

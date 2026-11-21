@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowUpDown, Bookmark, Plus } from "lucide-react";
+import { ArrowUpDown, Plus } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { useIsOwner } from "../api/account";
-import type { Book, Library, ReadingList, Series, View } from "../api/client";
+import type { Book, Collection, Library, ReadingList, Series } from "../api/client";
+import { useCollectionsOnHome, useFirstCollectionSeries } from "../api/collections";
 import { useLibraries } from "../api/libraries";
 import { useReadingLists } from "../api/lists";
 import {
@@ -12,7 +13,6 @@ import {
   useUpNext,
 } from "../api/reading";
 import { useSettings } from "../api/settings";
-import { linkTo, SERIES_IN_A_ROW, useViewSeries, useViews } from "../api/views";
 import { useWantToRead } from "../api/wanted";
 import { AddLibraryDialog } from "../components/AddLibraryDialog";
 import { ArrangeHomeDialog } from "../components/ArrangeHomeDialog";
@@ -22,12 +22,11 @@ import { ComicLibraryIcon } from "../components/ComicLibraryIcon";
 import { ListCard } from "../components/ListCard";
 import { Notice, ServerNotAnswering } from "../components/Notice";
 import { ScanProgress } from "../components/ScanProgress";
-import { rowClass } from "../components/Section";
 import { SeriesCard } from "../components/SeriesCard";
 import { Shelf, shelfTitleClass } from "../components/Shelf";
 import { ErrorText, textLinkClass } from "../components/text";
 import { contents } from "../format";
-import { arranged, arrangementIn, HOME_ROWS_KEPT_AS, viewRow } from "../homeRows";
+import { arranged, arrangementIn, collectionRow, HOME_ROWS_KEPT_AS } from "../homeRows";
 
 export const Route = createFileRoute("/")({ component: Home });
 
@@ -57,6 +56,9 @@ function bookCard(book: Book) {
 function seriesCard(series: Series) {
   return <SeriesCard key={series.id} series={series} titleAs="h3" />;
 }
+
+/** How many series a row of them shows. The rest are a click away. */
+const SERIES_IN_A_ROW = 24;
 
 /** The way from a row of series to all of them, which says how many when the row shows fewer. */
 function allOf(total: number): string {
@@ -143,18 +145,22 @@ function standing(list: ReadingList): number {
   return list.unread_count < list.book_count ? 0 : 1;
 }
 
-/** A view as a row: the first of its series, and the way to all of them. */
-function ViewRow({ view }: { view: View }) {
-  const series = useViewSeries(view);
+/** A collection as a row: the first of its series, by name, and the way to all of them. */
+function CollectionRow({ collection }: { collection: Collection }) {
+  const series = useFirstCollectionSeries(collection.id, SERIES_IN_A_ROW);
   return (
     <Row
-      title={view.name}
-      items={series.data?.series}
+      title={collection.name}
+      items={series.data}
       problem={series.error}
       card={seriesCard}
       action={
-        <Link {...linkTo(view)} className={textLinkClass}>
-          {allOf(series.data?.total ?? 0)}
+        <Link
+          to="/collections/$collectionId"
+          params={{ collectionId: collection.id }}
+          className={textLinkClass}
+        >
+          {allOf(collection.series_count)}
         </Link>
       }
     />
@@ -234,30 +240,30 @@ function own(id: string, name: string, Shown: (props: { title: string }) => Reac
 
 function Home() {
   const libraries = useLibraries();
-  const views = useViews();
+  // Only the collections that are rows: the rest are not worked out for Home.
+  const collections = useCollectionsOnHome();
   const settings = useSettings();
   const [arranging, setArranging] = useState(false);
 
-  const onHome = views.data?.filter((view) => view.on_home) ?? [];
+  const onHome = collections.data ?? [];
   // Every row there is, in the order they come in until arranged: what
-  // the reader wants to read comes before the reading lists, and the views
-  // that are rows, by name, after them.
+  // the reader wants to read comes before the reading lists, and the
+  // collections that are rows, by name, after them.
   const rows = [
     own("continue", "Continue reading", ContinueReading),
     own("up-next", "Up next", UpNext),
     own("want-to-read", "Want to read", WantToRead),
     own("lists", "Reading lists", ReadingLists),
-    ...onHome.map((view) => ({
-      id: viewRow(view.id),
-      name: view.name,
-      row: <ViewRow view={view} />,
+    ...onHome.map((collection) => ({
+      id: collectionRow(collection.id),
+      name: collection.name,
+      row: <CollectionRow collection={collection} />,
     })),
     own("updated", "Recently updated", RecentlyUpdated),
     own("added", "Recently added", RecentlyAdded),
   ];
   const arrangement = arrangementIn(settings.data?.[HOME_ROWS_KEPT_AS]);
   const inOrder = arranged(rows, arrangement.order);
-  const inMenu = views.data?.filter((view) => view.in_menu) ?? [];
 
   return (
     <>
@@ -270,9 +276,11 @@ function Home() {
         <NoLibraries />
       ) : (
         <>
-          {views.isError ? <ErrorText className="mb-8">{views.error.message}</ErrorText> : null}
+          {collections.isError ? (
+            <ErrorText className="mb-8">Collections: {collections.error.message}</ErrorText>
+          ) : null}
           {/* Until it is known how they are arranged, no row shows where it will not stay. */}
-          {settings.isPending || views.isPending
+          {settings.isPending || collections.isPending
             ? null
             : inOrder
                 .filter((row) => !arrangement.hidden.includes(row.id))
@@ -287,24 +295,14 @@ function Home() {
               </ul>
             </section>
           ) : null}
-          {/* A narrow window has no menu beside the page: its views are here. */}
-          {inMenu.length > 0 ? (
-            <section className="mt-12 md:hidden">
-              <h2 className={shelfTitleClass}>Views</h2>
-              <ul className="mt-2">
-                {inMenu.map((view) => (
-                  <li key={view.id} className={rowClass}>
-                    <Link {...linkTo(view)} className="flex min-h-11 items-center gap-3">
-                      <Bookmark className="size-5 shrink-0 text-fg-muted" aria-hidden="true" />
-                      <span className="min-w-0 truncate">{view.name}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
           <div className="mt-12">
-            <Button variant="quiet" onClick={() => setArranging(true)} className="-ml-4">
+            {/* Not while the collections that are rows are unknown: saving then would forget them. */}
+            <Button
+              variant="quiet"
+              onClick={() => setArranging(true)}
+              disabled={!collections.isSuccess}
+              className="-ml-4"
+            >
               <ArrowUpDown className="size-4" aria-hidden="true" />
               Arrange Home
             </Button>

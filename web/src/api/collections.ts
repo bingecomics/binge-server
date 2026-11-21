@@ -26,6 +26,15 @@ export function useCollections() {
   });
 }
 
+/** The collections the reader sees that are rows on Home, by name. */
+export function useCollectionsOnHome() {
+  return useQuery({
+    queryKey: [...COLLECTIONS, "on-home"],
+    queryFn: async () =>
+      unwrap(await api.GET("/api/v1/collections", { params: { query: { on_home: true } } })),
+  });
+}
+
 export function useCollection(id: number) {
   return useQuery({
     queryKey: [...COLLECTIONS, id],
@@ -40,6 +49,19 @@ export function useCollectionSeries(id: number) {
     queryKey: [...COLLECTIONS, id, "series"],
     queryFn: async () =>
       unwrap(await api.GET("/api/v1/collections/{id}/series", { params: { path: { id } } })),
+  });
+}
+
+/** The first series of a collection, by name, for its row on Home. */
+export function useFirstCollectionSeries(id: number, limit: number) {
+  return useQuery({
+    queryKey: [...COLLECTIONS, id, "series", "first", limit],
+    queryFn: async () =>
+      unwrap(
+        await api.GET("/api/v1/collections/{id}/series", {
+          params: { path: { id }, query: { limit } },
+        }),
+      ),
   });
 }
 
@@ -88,6 +110,33 @@ export function useShareCollection(id: number) {
         }),
       ),
     onSuccess: () => askAgainWithSearch(queryClient, COLLECTIONS),
+  });
+}
+
+/**
+ * Makes a collection of the reader's a row on Home, or no longer one, and
+ * says so over the page: nothing on the collection's own page moves.
+ */
+export function usePutCollectionOnHome(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (onHome: boolean) =>
+      unwrap(
+        await api.PUT("/api/v1/collections/{id}/on-home", {
+          params: { path: { id } },
+          body: { on_home: onHome },
+        }),
+      ),
+    onSuccess: (changed) => {
+      const shared = changed.shared_with_all || changed.shared_with.length > 0;
+      tell(
+        changed.on_home
+          ? `“${changed.name}” is a row on Home${shared ? ", for you and everyone who sees it" : ""}.`
+          : `“${changed.name}” is no longer a row on Home.`,
+      );
+      return askAgainWithSearch(queryClient, COLLECTIONS);
+    },
+    onError: sayProblem,
   });
 }
 

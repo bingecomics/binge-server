@@ -334,14 +334,11 @@ export function Narrowing({
   asked,
   shown,
   of,
-  action,
 }: {
   libraryId: number;
   asked: Asked;
   shown: number | undefined;
   of: number;
-  /** What sits after the buttons, such as keeping what is asked as a view. */
-  action?: ReactNode;
 }) {
   const [open, setOpen] = useState(startsOpen);
   // The people asked for and ruled out, by their ids.
@@ -396,7 +393,6 @@ export function Narrowing({
             </span>
           ) : null}
         </button>
-        {action}
         <p className="ml-auto text-fg-muted text-metadata" aria-live="polite">
           {shown === undefined
             ? null

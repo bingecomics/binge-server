@@ -712,6 +712,17 @@
         ],
         "summary": "Lists the collections the caller sees, in name order: their own, and the\nones shared with them or with everyone. A collection of someone else's\nthat holds no series the caller may read is left out.",
         "operationId": "listCollections",
+        "parameters": [
+          {
+            "name": "on_home",
+            "in": "query",
+            "description": "Only the ones that are rows on Home.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -938,6 +949,67 @@
         }
       }
     },
+    "/api/v1/collections/{id}/on-home": {
+      "put": {
+        "tags": [
+          "collections"
+        ],
+        "summary": "Makes a collection a row on Home, or no longer one. Only the one whose\ncollection it is can. It is a row for everyone who sees the collection,\nwith the series they may read: a collection shared with everyone is a\nrow on everyone's Home. Each person puts the row where they want it, or\naway.",
+        "operationId": "putCollectionOnHome",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The collection",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnHome"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Collection"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The collection is someone else's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/collections/{id}/series": {
       "get": {
         "tags": [
@@ -954,6 +1026,17 @@
             "schema": {
               "type": "integer",
               "format": "int64"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many, from the first by name. All of them when left out.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
             }
           }
         ],
@@ -6119,198 +6202,6 @@
         ]
       }
     },
-    "/api/v1/views": {
-      "get": {
-        "tags": [
-          "views"
-        ],
-        "summary": "Lists the views of the libraries the caller may read, in name order.",
-        "operationId": "listViews",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/View"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "views"
-        ],
-        "summary": "Keeps a view of a library. Everyone who may read the library sees it.\nOnly the owner can.",
-        "operationId": "addView",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewView"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/View"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "It has no name, a year is not written as one, or there are too many views or values",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller is not the owner",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "There is no such library",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/views/{id}": {
-      "delete": {
-        "tags": [
-          "views"
-        ],
-        "summary": "Deletes a view. The library and its books are not touched. Only the\nowner can.",
-        "operationId": "deleteView",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "The view",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "204": {},
-          "403": {
-            "description": "The caller is not the owner",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "views"
-        ],
-        "summary": "Changes a view. Only the owner can.",
-        "operationId": "changeView",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "description": "The view",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ViewChange"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/View"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller is not the owner",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/v1/want-to-read": {
       "get": {
         "tags": [
@@ -6503,95 +6394,6 @@
           "name": {
             "type": "string",
             "description": "What the person called it, such as the device it is on."
-          }
-        }
-      },
-      "Asked": {
-        "type": "object",
-        "description": "Which series of a library, and in what order: what\n`GET /libraries/{id}/series` takes, and what a view keeps. A series is\nnarrowed by what its books say: it is of a publisher, a year or a person\nwhen one of its books is. Each thing to narrow by can be given several\ntimes: a series stays when it has one of the values asked for, and none\nof those ruled out with `not_`. It has to pass every kind of narrowing\ngiven, and what is left out is not narrowed by.",
-        "properties": {
-          "not_penciller": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          "not_publisher": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "not_read": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReadState"
-            }
-          },
-          "not_writer": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          "not_year": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "penciller": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "description": "The id of a person a book names as a penciller."
-          },
-          "publisher": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "A publisher, as the books name it."
-          },
-          "read": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ReadState"
-            },
-            "description": "How far the caller is through the series."
-          },
-          "reverse": {
-            "type": "boolean",
-            "description": "Turns the order around."
-          },
-          "seed": {
-            "type": "integer",
-            "format": "int32",
-            "description": "Which of the orders `sort=random` gives. Keep it while reading the\nlist a part at a time.",
-            "minimum": 0
-          },
-          "sort": {
-            "$ref": "#/components/schemas/SeriesSort",
-            "description": "What to order the series by. By name when left out. Series the order\nsays nothing about, such as one with no year, come last."
-          },
-          "writer": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "format": "int64"
-            },
-            "description": "The id of a person a book names as a writer."
-          },
-          "year": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "A year a book came out, as `1993`, or the ten from one, as `1990s`."
           }
         }
       },
@@ -7177,7 +6979,8 @@
           "mine",
           "shared_with_all",
           "shared_with",
-          "from_files"
+          "from_files",
+          "on_home"
         ],
         "properties": {
           "book_count": {
@@ -7217,6 +7020,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "on_home": {
+            "type": "boolean",
+            "description": "Whether it is a row on Home, for everyone who sees it. The one whose\ncollection it is says so. Where the row sits, and whether it is put\naway, is each person's own: see `home.rows` in the settings."
           },
           "series_count": {
             "type": "integer",
@@ -8121,32 +7928,6 @@
           }
         }
       },
-      "NewView": {
-        "type": "object",
-        "required": [
-          "library_id",
-          "name"
-        ],
-        "properties": {
-          "asked": {
-            "$ref": "#/components/schemas/Asked",
-            "description": "The whole library by name when left out."
-          },
-          "in_menu": {
-            "type": "boolean"
-          },
-          "library_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "name": {
-            "type": "string"
-          },
-          "on_home": {
-            "type": "boolean"
-          }
-        }
-      },
       "NewerVersion": {
         "type": "object",
         "description": "A version newer than the one that runs.",
@@ -8180,6 +7961,19 @@
             "$ref": "#/components/schemas/CannotUpdate"
           }
         }
+      },
+      "OnHome": {
+        "type": "object",
+        "description": "Whether a collection is a row on Home from now on.",
+        "required": [
+          "on_home"
+        ],
+        "properties": {
+          "on_home": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
       },
       "Page": {
         "type": "object",
@@ -8591,15 +8385,6 @@
             "description": "How long the pages not yet read will take the caller, in seconds, at\ntheir own pace: the time a page took them over their latest\nsittings. Missing until they have read enough here to tell."
           }
         }
-      },
-      "ReadState": {
-        "type": "string",
-        "description": "How far the caller is through a series.",
-        "enum": [
-          "unread",
-          "in_progress",
-          "read"
-        ]
       },
       "ReadWriter": {
         "type": "object",
@@ -9307,18 +9092,6 @@
         ],
         "description": "A series seen whole, for the page that presents it: what its books say\nabout it together, and how far the caller is through it."
       },
-      "SeriesSort": {
-        "type": "string",
-        "description": "What a library's series are ordered by.",
-        "enum": [
-          "name",
-          "added",
-          "year",
-          "last_read",
-          "unread",
-          "random"
-        ]
-      },
       "SettingValue": {
         "type": "object",
         "required": [
@@ -9569,77 +9342,6 @@
             "type": "string"
           }
         }
-      },
-      "View": {
-        "type": "object",
-        "description": "A library narrowed and ordered, kept under a name. Its series are what\n`GET /libraries/{library_id}/series` answers when asked for `asked`.",
-        "required": [
-          "id",
-          "library_id",
-          "name",
-          "asked",
-          "on_home",
-          "in_menu"
-        ],
-        "properties": {
-          "asked": {
-            "$ref": "#/components/schemas/Asked"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "in_menu": {
-            "type": "boolean",
-            "description": "Whether it is an entry in the menu."
-          },
-          "library_id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "name": {
-            "type": "string"
-          },
-          "on_home": {
-            "type": "boolean",
-            "description": "Whether it is a row on the home page."
-          }
-        }
-      },
-      "ViewChange": {
-        "type": "object",
-        "description": "What to change of a view. What is left out stays as it is.",
-        "properties": {
-          "asked": {
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Asked",
-                "description": "Replaces the order and everything the view narrows by."
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "in_menu": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "name": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "on_home": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          }
-        }
       }
     },
     "securitySchemes": {
@@ -9704,10 +9406,6 @@
     {
       "name": "people",
       "description": "Who the books name, and the names they go by"
-    },
-    {
-      "name": "views",
-      "description": "A library narrowed and ordered, kept under a name"
     }
   ]
 }

@@ -417,7 +417,6 @@ impl Catalog {
             .persistent(false)
             .execute(&mut *tx)
             .await?;
-        crate::views::follow_merge(&mut tx, into, &others).await?;
         tx.commit().await?;
         Ok(())
     }

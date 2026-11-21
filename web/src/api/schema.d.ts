@@ -291,6 +291,29 @@ export interface paths {
         patch: operations["changeCollection"];
         trace?: never;
     };
+    "/api/v1/collections/{id}/on-home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Makes a collection a row on Home, or no longer one. Only the one whose
+         *     collection it is can. It is a row for everyone who sees the collection,
+         *     with the series they may read: a collection shared with everyone is a
+         *     row on everyone's Home. Each person puts the row where they want it, or
+         *     away.
+         */
+        put: operations["putCollectionOnHome"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/collections/{id}/series": {
         parameters: {
             query?: never;
@@ -1881,48 +1904,6 @@ export interface paths {
         patch: operations["changeUser"];
         trace?: never;
     };
-    "/api/v1/views": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lists the views of the libraries the caller may read, in name order. */
-        get: operations["listViews"];
-        put?: never;
-        /**
-         * Keeps a view of a library. Everyone who may read the library sees it.
-         *     Only the owner can.
-         */
-        post: operations["addView"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/views/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Deletes a view. The library and its books are not touched. Only the
-         *     owner can.
-         */
-        delete: operations["deleteView"];
-        options?: never;
-        head?: never;
-        /** Changes a view. Only the owner can. */
-        patch: operations["changeView"];
-        trace?: never;
-    };
     "/api/v1/want-to-read": {
         parameters: {
             query?: never;
@@ -2021,45 +2002,6 @@ export interface components {
             last_used_at?: number | null;
             /** @description What the person called it, such as the device it is on. */
             name: string;
-        };
-        /**
-         * @description Which series of a library, and in what order: what
-         *     `GET /libraries/{id}/series` takes, and what a view keeps. A series is
-         *     narrowed by what its books say: it is of a publisher, a year or a person
-         *     when one of its books is. Each thing to narrow by can be given several
-         *     times: a series stays when it has one of the values asked for, and none
-         *     of those ruled out with `not_`. It has to pass every kind of narrowing
-         *     given, and what is left out is not narrowed by.
-         */
-        Asked: {
-            not_penciller?: number[];
-            not_publisher?: string[];
-            not_read?: components["schemas"]["ReadState"][];
-            not_writer?: number[];
-            not_year?: string[];
-            /** @description The id of a person a book names as a penciller. */
-            penciller?: number[];
-            /** @description A publisher, as the books name it. */
-            publisher?: string[];
-            /** @description How far the caller is through the series. */
-            read?: components["schemas"]["ReadState"][];
-            /** @description Turns the order around. */
-            reverse?: boolean;
-            /**
-             * Format: int32
-             * @description Which of the orders `sort=random` gives. Keep it while reading the
-             *     list a part at a time.
-             */
-            seed?: number;
-            /**
-             * @description What to order the series by. By name when left out. Series the order
-             *     says nothing about, such as one with no year, come last.
-             */
-            sort?: components["schemas"]["SeriesSort"];
-            /** @description The id of a person a book names as a writer. */
-            writer?: number[];
-            /** @description A year a book came out, as `1993`, or the ten from one, as `1990s`. */
-            year?: string[];
         };
         /** @description One comic file. */
         Book: {
@@ -2331,6 +2273,12 @@ export interface components {
              */
             mine: boolean;
             name: string;
+            /**
+             * @description Whether it is a row on Home, for everyone who sees it. The one whose
+             *     collection it is says so. Where the row sits, and whether it is put
+             *     away, is each person's own: see `home.rows` in the settings.
+             */
+            on_home: boolean;
             /**
              * Format: int64
              * @description How many of its series the caller may read.
@@ -2805,15 +2753,6 @@ export interface components {
              */
             password: string;
         };
-        NewView: {
-            /** @description The whole library by name when left out. */
-            asked?: components["schemas"]["Asked"];
-            in_menu?: boolean;
-            /** Format: int64 */
-            library_id: number;
-            name: string;
-            on_home?: boolean;
-        };
         /** @description A version newer than the one that runs. */
         NewerVersion: {
             /** @description The page that says what changed in it. */
@@ -2828,6 +2767,10 @@ export interface components {
             /** @description The same in a sentence for the owner. */
             message: string;
             why: components["schemas"]["CannotUpdate"];
+        };
+        /** @description Whether a collection is a row on Home from now on. */
+        OnHome: {
+            on_home: boolean;
         };
         /** @description One page of a book. */
         Page: {
@@ -3046,11 +2989,6 @@ export interface components {
              */
             seconds_left?: number | null;
         };
-        /**
-         * @description How far the caller is through a series.
-         * @enum {string}
-         */
-        ReadState: "unread" | "in_progress" | "read";
         /** @description A writer the caller read. */
         ReadWriter: {
             /**
@@ -3423,11 +3361,6 @@ export interface components {
             groups: components["schemas"]["Group"][];
             series: components["schemas"]["Series"];
         };
-        /**
-         * @description What a library's series are ordered by.
-         * @enum {string}
-         */
-        SeriesSort: "name" | "added" | "year" | "last_read" | "unread" | "random";
         SettingValue: {
             /** @description 8 KB at most. */
             value: string;
@@ -3543,29 +3476,6 @@ export interface components {
             /** Format: int64 */
             id: number;
             name: string;
-        };
-        /**
-         * @description A library narrowed and ordered, kept under a name. Its series are what
-         *     `GET /libraries/{library_id}/series` answers when asked for `asked`.
-         */
-        View: {
-            asked: components["schemas"]["Asked"];
-            /** Format: int64 */
-            id: number;
-            /** @description Whether it is an entry in the menu. */
-            in_menu: boolean;
-            /** Format: int64 */
-            library_id: number;
-            name: string;
-            /** @description Whether it is a row on the home page. */
-            on_home: boolean;
-        };
-        /** @description What to change of a view. What is left out stays as it is. */
-        ViewChange: {
-            asked?: components["schemas"]["Asked"] | null;
-            in_menu?: boolean | null;
-            name?: string | null;
-            on_home?: boolean | null;
         };
     };
     responses: never;
@@ -4096,7 +4006,10 @@ export interface operations {
     };
     listCollections: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only the ones that are rows on Home. */
+                on_home?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4282,9 +4195,55 @@ export interface operations {
             };
         };
     };
-    listCollectionSeries: {
+    putCollectionOnHome: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                /** @description The collection */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnHome"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            /** @description The collection is someone else's */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listCollectionSeries: {
+        parameters: {
+            query?: {
+                /** @description How many, from the first by name. All of them when left out. */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /** @description The collection */
@@ -7954,163 +7913,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-        };
-    };
-    listViews: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["View"][];
-                };
-            };
-        };
-    };
-    addView: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewView"];
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["View"];
-                };
-            };
-            /** @description It has no name, a year is not written as one, or there are too many views or values */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            /** @description The caller is not the owner */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            /** @description There is no such library */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-        };
-    };
-    deleteView: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The view */
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description The caller is not the owner */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-        };
-    };
-    changeView: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The view */
-                id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ViewChange"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["View"];
-                };
-            };
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiError"];
-                };
-            };
-            /** @description The caller is not the owner */
             403: {
                 headers: {
                     [name: string]: unknown;

@@ -675,8 +675,10 @@ off, and the latest 7 are kept. Who is reading now is in the list the
 icon of the bar opens, for the owner. What was read is at `/history`, a
 year at a time.
 
-Left for later: views of a member's own and views over more than one
-library; putting a copy of the database back from the app (it is done by
+Views were removed on 2026-11-21 (see "P1. Views go" below): a collection
+is the row of one's own now.
+
+Left for later: putting a copy of the database back from the app (it is done by
 hand, with the server stopped); and the reader's own choices (fit, pages
 side by side, direction), which stayed in the browser until W5.
 
@@ -791,12 +793,25 @@ Built (2026-11-20): everything below.
 
 - The side menu has one entry for what is a person's own, My Binge, in
   place of one entry each: want to read, the reading lists, the
-  collections and the favorite pages. The menu is Home, My Binge, the
-  views and the libraries.
+  collections and the favorite pages. The menu is Home, My Binge and the
+  libraries.
 - Each of the four pages has the four as a row of choices over it. My
   Binge opens on want to read.
 - The pages a person kept while reading are called favorites, and their
   mark is a heart. The API still calls them kept pages.
+
+#### P1. Views go
+
+Built (2026-11-21): everything below
+([ADR 0025](docs/adr/0025-views-go-and-a-collection-can-be-a-row-on-home.md)).
+
+- Views are removed: a library's narrowing kept under a name, as a row on
+  Home or an entry in the menu. The ones there were are dropped.
+- A library is still narrowed, with what is asked in the address of its
+  page.
+- A collection's maker shows it on Home. It is a row for everyone who
+  sees the collection, and each person moves it or puts it away where
+  they arrange Home.
 
 ### Later, in outline only
 
