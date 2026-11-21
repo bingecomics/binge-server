@@ -24,14 +24,20 @@ function CollectionsPage() {
   const navigate = useNavigate();
   const [making, setMaking] = useState(false);
 
+  // The choices of My Binge stay while the page comes, and when it does not.
   if (collections.isPending) {
-    return null;
+    return <MyBingeParts />;
   }
   if (collections.isError) {
-    return gotNoAnswer(collections.error) ? (
-      <ServerNotAnswering />
-    ) : (
-      <ErrorText>{collections.error.message}</ErrorText>
+    return (
+      <>
+        <MyBingeParts />
+        {gotNoAnswer(collections.error) ? (
+          <ServerNotAnswering />
+        ) : (
+          <ErrorText>{collections.error.message}</ErrorText>
+        )}
+      </>
     );
   }
 

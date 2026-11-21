@@ -26,14 +26,20 @@ function WantToReadPage() {
   const page = Route.useSearch().page ?? 1;
   const wanted = useWantToRead(page);
 
+  // The choices of My Binge stay while the page comes, and when it does not.
   if (wanted.isPending) {
-    return null;
+    return <MyBingeParts />;
   }
   if (wanted.isError) {
-    return gotNoAnswer(wanted.error) ? (
-      <ServerNotAnswering />
-    ) : (
-      <ErrorText>{wanted.error.message}</ErrorText>
+    return (
+      <>
+        <MyBingeParts />
+        {gotNoAnswer(wanted.error) ? (
+          <ServerNotAnswering />
+        ) : (
+          <ErrorText>{wanted.error.message}</ErrorText>
+        )}
+      </>
     );
   }
 

@@ -24,14 +24,20 @@ function ListsPage() {
   const navigate = useNavigate();
   const [making, setMaking] = useState(false);
 
+  // The choices of My Binge stay while the page comes, and when it does not.
   if (lists.isPending) {
-    return null;
+    return <MyBingeParts />;
   }
   if (lists.isError) {
-    return gotNoAnswer(lists.error) ? (
-      <ServerNotAnswering />
-    ) : (
-      <ErrorText>{lists.error.message}</ErrorText>
+    return (
+      <>
+        <MyBingeParts />
+        {gotNoAnswer(lists.error) ? (
+          <ServerNotAnswering />
+        ) : (
+          <ErrorText>{lists.error.message}</ErrorText>
+        )}
+      </>
     );
   }
 
