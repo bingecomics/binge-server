@@ -617,6 +617,28 @@ impl Catalog {
         Ok(())
     }
 
+    /// Takes out of a list of `user`'s every book they have read to the
+    /// end, and returns how many that was. The others keep their order. A
+    /// book they are not shown, whose file is gone for now or is of a
+    /// library they no longer read, stays.
+    pub async fn remove_read_from_list(&self, user: UserId, id: i64) -> Result<u64, CatalogError> {
+        let mut tx = self.db.begin_write().await?;
+        LISTS.theirs(&mut *tx, user, id).await?;
+        let query = format!(
+            "DELETE FROM reading_list_book WHERE list_id = ?2 AND EXISTS \
+             (SELECT 1 FROM book b WHERE b.content_hash = reading_list_book.content_hash \
+             AND {} AND NOT ({UNREAD}))",
+            may_read("b.library_id")
+        );
+        let removed = sqlx::query(&query)
+            .bind(user)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(removed.rows_affected())
+    }
+
     /// Moves a book of a list of `user`'s to `position` among the books
     /// they are shown, from 0. A position past the end is the end. The
     /// books not shown, whose files are gone for now or are of a library

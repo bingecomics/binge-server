@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { seriesCount } from "../format";
+import { isShared, seriesCount } from "../format";
 import { tell } from "../problems";
 import {
   api,
@@ -128,7 +128,7 @@ export function usePutCollectionOnHome(id: number) {
         }),
       ),
     onSuccess: (changed) => {
-      const shared = changed.shared_with_all || changed.shared_with.length > 0;
+      const shared = isShared(changed);
       tell(
         changed.on_home
           ? `“${changed.name}” is a row on Home${shared ? ", for you and everyone who sees it" : ""}.`

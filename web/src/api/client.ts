@@ -134,6 +134,11 @@ export function smallPageUrl(identity: string, number: number): string {
   return `${pageUrl(identity, number)}/thumbnail`;
 }
 
+/** Address of a reading list written as a CBL file, which the browser saves. */
+export function cblUrl(listId: number): string {
+  return `/api/v1/reading-lists/${listId}/cbl`;
+}
+
 /**
  * A file as the body of a request, sent as it is. One of more than
  * `biggest` megabytes is refused here and not by the server, which would be

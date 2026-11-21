@@ -1,13 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ChevronLeft, Pencil, Trash2, Users } from "lucide-react";
+import { ChevronLeft, Download, ListX, Pencil, Trash2, Users } from "lucide-react";
 import { useState } from "react";
 import { useOthers } from "../api/account";
-import { gotNoAnswer } from "../api/client";
+import { cblUrl, gotNoAnswer } from "../api/client";
 import {
   useChangeList,
   useDeleteList,
   useListBooks,
   useReadingList,
+  useRemoveRead,
   useShareList,
 } from "../api/lists";
 import { BooksHeader } from "../components/BooksHeader";
@@ -16,12 +17,13 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CoverChoices } from "../components/CoverChoices";
 import { madeAndShared } from "../components/FromFiles";
 import { ListBooks } from "../components/ListBooks";
-import { MenuItem } from "../components/Menu";
+import { MenuDownload, MenuItem } from "../components/Menu";
 import { NameAndSummaryDialog } from "../components/NameAndSummary";
 import { NotOnServer, ServerNotAnswering } from "../components/Notice";
 import { BooksMenu } from "../components/ReadMarks";
 import { ShareDialog } from "../components/ShareDialog";
 import { ErrorText, upLinkClass } from "../components/text";
+import { books as bookCount, isShared } from "../format";
 
 export const Route = createFileRoute("/lists/$listId")({
   params: {
@@ -38,7 +40,8 @@ export const Route = createFileRoute("/lists/$listId")({
  *
  * The one whose list it is changes it and says who else sees it. Anyone
  * else reads it and is told whose it is. On a server of one person there
- * is nobody to share with, and nothing about sharing is shown.
+ * is nobody to share with, and nothing about sharing is shown. Anyone who
+ * sees the list saves it as a CBL file.
  */
 function ListPage() {
   const { listId } = Route.useParams();
@@ -50,9 +53,11 @@ function ListPage() {
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [removingRead, setRemovingRead] = useState(false);
   const change = useChangeList(listId);
   const share = useShareList(listId);
   const remove = useDeleteList(() => navigate({ to: "/lists", replace: true }));
+  const removeRead = useRemoveRead(() => setRemovingRead(false));
 
   if (overview.isPending) {
     return null;
@@ -70,6 +75,7 @@ function ListPage() {
   const { list } = overview.data;
   const mine = list.mine;
   const canShare = mine && others.length > 0;
+  const readCount = list.book_count - list.unread_count;
   return (
     <>
       <BooksHeader
@@ -104,10 +110,20 @@ function ListPage() {
                   </MenuItem>
                 ) : null}
                 <CoverChoices of={{ kind: "lists", id: list.id }} chosen={list.cover_chosen} />
-                <MenuItem icon={Trash2} onSelect={() => setDeleting(true)}>
-                  Delete list…
-                </MenuItem>
+                {readCount > 0 ? (
+                  <MenuItem icon={ListX} onSelect={() => setRemovingRead(true)}>
+                    Remove read books…
+                  </MenuItem>
+                ) : null}
               </>
+            ) : null}
+            <MenuDownload icon={Download} href={cblUrl(list.id)}>
+              Export as CBL
+            </MenuDownload>
+            {mine ? (
+              <MenuItem icon={Trash2} onSelect={() => setDeleting(true)}>
+                Delete list…
+              </MenuItem>
             ) : null}
           </BooksMenu>
         }
@@ -160,6 +176,25 @@ function ListPage() {
         while they can read none of them. What you have read stays yours, and only you can change
         the list.
       </ShareDialog>
+      <ConfirmDialog
+        open={removingRead}
+        onClose={() => {
+          setRemovingRead(false);
+          removeRead.reset();
+        }}
+        title={`Remove ${bookCount(readCount)} you have read?`}
+        confirm="Remove read books"
+        confirming="Removing…"
+        isPending={removeRead.isPending}
+        error={removeRead.error}
+        onConfirm={() => removeRead.mutate(list)}
+      >
+        The list keeps only what you have not finished. The books stay in the library, and what you
+        read of them stays read.
+        {isShared(list)
+          ? " The list is shared: the books leave it for everyone who sees it."
+          : null}
+      </ConfirmDialog>
       <ConfirmDialog
         open={deleting}
         onClose={() => {

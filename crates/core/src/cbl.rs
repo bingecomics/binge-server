@@ -1,5 +1,5 @@
 //! Importing a CBL file: a reading list as ComicRack writes it, which is
-//! how reading orders are passed around.
+//! how reading orders are passed around. And writing one, from a list.
 //!
 //! A CBL file names books by their series, volume and number, not by any
 //! file. [`Catalog::plan_cbl`] works out which book of the server each entry
@@ -13,11 +13,14 @@
 //! and a rule comes before all of them the next time they import.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 
 use crate::accounts::UserId;
-use crate::catalog::{Book, Catalog, CatalogError, GroupKind, PLACED, may_read};
+use crate::catalog::{
+    Book, Catalog, CatalogError, GroupKind, PLACE_OF, PLACED, YEAR, first_copy, may_read,
+};
 use crate::import::{self, name_key, written};
-use crate::lists::{LISTS, UNREADABLE};
+use crate::lists::{LISTS, UNREADABLE, may_see};
 use crate::reading::list;
 
 /// The biggest CBL file read, in bytes: 5 MB. One entry is a line of text.
@@ -169,6 +172,92 @@ fn parse(file: &[u8]) -> Result<Cbl, CatalogError> {
         name: said(child("Name").and_then(|name| name.text())),
         entries,
     })
+}
+
+/// A reading list written as a CBL file.
+#[derive(Clone, Debug)]
+pub struct CblFile {
+    /// The list's name, which the file is called by.
+    pub name: String,
+    /// The file's text: XML, in UTF-8.
+    pub text: String,
+}
+
+/// A book of a list where it sits, as far as writing it asks: what
+/// [`pick`] tells books apart by.
+#[derive(sqlx::FromRow)]
+struct Listed {
+    /// Nothing for a book in no series.
+    series: Option<String>,
+    kind: Option<GroupKind>,
+    group_number: Option<i64>,
+    number: Option<String>,
+    year: Option<i64>,
+}
+
+/// A book as a CBL file names it: by its series, its number, the number
+/// of its volume and the year it came out. An annual is of "Batman
+/// Annual" and a collected edition of "Batman TPB", as such files write
+/// them and as [`without_words`] reads them back. Nothing for a book in no
+/// series.
+fn entry_of(book: Listed) -> Option<CblEntry> {
+    let series = book.series?;
+    Some(CblEntry {
+        series: match book.kind {
+            Some(GroupKind::Annual) => format!("{series} Annual"),
+            Some(GroupKind::Collected) => format!("{series} TPB"),
+            _ => series,
+        },
+        number: book.number,
+        volume: book.group_number.map(|number| number.to_string()),
+        year: book.year,
+    })
+}
+
+/// Text as XML holds it, between tags or as the value of an attribute.
+/// What XML has no way to write, as most control characters, is left out.
+fn escaped(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for sign in text.chars() {
+        match sign {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\t' | '\n' | '\r' => out.push(' '),
+            sign if sign.is_control() => {}
+            sign => out.push(sign),
+        }
+    }
+    out
+}
+
+/// A list's name and entries as the text of a CBL file, which [`parse`]
+/// reads back as the same name and entries.
+fn write(name: &str, entries: &[CblEntry]) -> String {
+    let mut text = format!(
+        "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n\
+         <ReadingList xmlns:xsd=\"http://www.w3.org/2001/XMLSchema\" \
+         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\n  \
+         <Name>{}</Name>\n  <NumIssues>{}</NumIssues>\n  <Books>\n",
+        escaped(name),
+        entries.len()
+    );
+    for entry in entries {
+        let said = |text: Option<&str>| escaped(text.unwrap_or_default());
+        let year = entry.year.map(|year| year.to_string());
+        // Writing to a `String` cannot fail.
+        let _ = writeln!(
+            text,
+            "    <Book Series=\"{}\" Number=\"{}\" Volume=\"{}\" Year=\"{}\" />",
+            escaped(&entry.series),
+            said(entry.number.as_deref()),
+            said(entry.volume.as_deref()),
+            said(year.as_deref()),
+        );
+    }
+    text.push_str("  </Books>\n  <Matchers />\n</ReadingList>\n");
+    text
 }
 
 /// A name without "The", "A" or "An" in front of it.
@@ -469,6 +558,38 @@ fn choose(
 }
 
 impl Catalog {
+    /// A reading list `user` sees, written as a CBL file: the books they
+    /// are shown, in the list's order.
+    pub async fn list_as_cbl(&self, user: UserId, id: i64) -> Result<CblFile, CatalogError> {
+        let query = format!(
+            "SELECT rl.name FROM reading_list rl WHERE rl.id = ?2 AND {}",
+            may_see("rl.id")
+        );
+        let name: String = sqlx::query_scalar(&query)
+            .bind(user)
+            .bind(id)
+            .fetch_optional(self.db.pool())
+            .await?
+            .ok_or(CatalogError::NotFound)?;
+        let query = format!(
+            "SELECT bs.name AS series, g.kind, g.number AS group_number, bp.number, \
+             {YEAR} AS year FROM reading_list_book lb JOIN book b ON b.id = {} \
+             LEFT JOIN book_info i ON i.book_id = b.id {PLACE_OF} \
+             WHERE lb.list_id = ?2 ORDER BY lb.position",
+            first_copy("lb")
+        );
+        let books: Vec<Listed> = sqlx::query_as(&query)
+            .bind(user)
+            .bind(id)
+            .fetch_all(self.db.pool())
+            .await?;
+        let entries: Vec<CblEntry> = books.into_iter().filter_map(entry_of).collect();
+        Ok(CblFile {
+            text: write(&name, &entries),
+            name,
+        })
+    }
+
     /// Reads a CBL file and says, for each of its entries, which book among
     /// those `user` may read it means and how that was found. Makes nothing.
     pub async fn plan_cbl(&self, user: UserId, file: &[u8]) -> Result<CblPlan, CatalogError> {
@@ -712,6 +833,53 @@ mod tests {
         ] {
             assert!(matches!(parse(not_one), Err(CatalogError::Invalid(_))));
         }
+    }
+
+    #[test]
+    fn a_list_is_written_as_a_file_that_reads_back_the_same() {
+        let entries = [
+            entry("Night Runner", "1", "1987", 1987),
+            entry("Lock & Key <\"Omega\">", "0.5", "", 0),
+            entry("The Lamplighters Annual", "", "2", 2016),
+        ];
+        let text = write("Night of the Runner & \"Friends\"", &entries);
+        assert!(text.contains("<NumIssues>3</NumIssues>"));
+        let read = parse(text.as_bytes()).unwrap();
+        assert_eq!(
+            read.name.as_deref(),
+            Some("Night of the Runner & \"Friends\"")
+        );
+        assert_eq!(read.entries, entries);
+        // What XML cannot hold is left out, not written.
+        assert_eq!(escaped("a\u{1}b\tc"), "ab c");
+    }
+
+    #[test]
+    fn a_book_is_named_as_the_import_tells_it_apart() {
+        let listed = |series: Option<&str>, group: Option<(GroupKind, i64)>| Listed {
+            series: series.map(str::to_owned),
+            kind: group.map(|(kind, _)| kind),
+            group_number: group.map(|(_, number)| number).filter(|number| *number > 0),
+            number: Some("1".to_owned()),
+            year: Some(1988),
+        };
+        let named = |book: Listed| entry_of(book).map(|entry| (entry.series, entry.volume));
+        let volume = listed(Some("Night Runner"), Some((GroupKind::Volume, 2)));
+        assert_eq!(
+            named(volume),
+            Some(("Night Runner".to_owned(), Some("2".to_owned())))
+        );
+        // The kinds the import has a word for carry it, and so read back.
+        for (kind, name) in [
+            (GroupKind::Annual, "Night Runner Annual"),
+            (GroupKind::Collected, "Night Runner TPB"),
+        ] {
+            let book = listed(Some("Night Runner"), Some((kind, 0)));
+            assert_eq!(named(book), Some((name.to_owned(), None)));
+            assert_eq!(without_words(name), ("Night Runner".to_owned(), Some(kind)));
+        }
+        assert_eq!(named(listed(Some("Night Runner"), None)).unwrap().1, None);
+        assert!(entry_of(listed(None, None)).is_none());
     }
 
     #[test]

@@ -1267,6 +1267,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reading-lists/{id}/cbl": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Answers with a reading list as a CBL file, to save: the books the caller
+         *     is shown, in the list's order, each named by its series, number, volume
+         *     and year. Anyone who sees the list can.
+         * @description It is the file `POST /reading-lists/import` reads: an annual's series
+         *     ends in "Annual" and a collected edition's in "TPB", which is how the
+         *     import tells them from the issue with the same number. A book in no
+         *     series is left out, and a book with no number is one entry like the
+         *     others of its series that have none.
+         */
+        get: operations["exportReadingList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reading-lists/{id}/cover": {
         parameters: {
             query?: never;
@@ -1308,6 +1334,29 @@ export interface paths {
         put: operations["giveReadingListCover"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reading-lists/{id}/read-books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Takes out of a reading list every book the caller has read to the end.
+         *     The others keep their order. Only the one whose list it is can, and the
+         *     books go for everyone the list is shared with.
+         * @description A book the caller is not shown stays: one whose file is gone for now, or
+         *     of a library they no longer read.
+         */
+        delete: operations["removeReadFromReadingList"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3176,6 +3225,14 @@ export interface components {
             writers: components["schemas"]["ReadWriter"][];
             /** Format: int64 */
             year: number;
+        };
+        /** @description What taking the read books out of a list changed. */
+        Removed: {
+            /**
+             * Format: int64
+             * @description How many books the list lost.
+             */
+            books: number;
         };
         /** @enum {string} */
         Role: "owner" | "member";
@@ -6434,6 +6491,37 @@ export interface operations {
             };
         };
     };
+    exportReadingList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The reading list */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CBL file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/xml": string;
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     chooseReadingListCover: {
         parameters: {
             query?: never;
@@ -6558,6 +6646,45 @@ export interface operations {
                 };
             };
             /** @description The caller is not the owner, or the list is not their own */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    removeReadFromReadingList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The reading list */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Removed"];
+                };
+            };
+            /** @description The list is someone else's */
             403: {
                 headers: {
                     [name: string]: unknown;

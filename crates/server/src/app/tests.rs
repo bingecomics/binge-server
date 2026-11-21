@@ -2281,6 +2281,14 @@ impl Server {
         panic!("no book is called {name}");
     }
 
+    /// Asks what a CBL file would make.
+    async fn plan_cbl(&self, file: &str) -> Answer {
+        let request = Request::post("/api/v1/reading-lists/import")
+            .header(header::CONTENT_TYPE, "application/xml");
+        let sent = request.body(Body::from(file.to_owned())).unwrap();
+        self.send(sent).await
+    }
+
     /// The names of the books a path lists.
     async fn names_at(&self, path: &str) -> Vec<String> {
         let books = self.get(path).await.json();
@@ -2965,6 +2973,86 @@ async fn a_reading_list_is_its_makers_until_it_is_shared() {
 }
 
 #[tokio::test]
+async fn a_list_loses_what_was_read_and_is_written_as_a_cbl_file() {
+    let server = server().await;
+    for (seed, file) in [
+        "Patrol/Patrol 001",
+        "Patrol/Patrol 002",
+        "Saga & Co/Saga & Co 001",
+    ]
+    .iter()
+    .enumerate()
+    {
+        fixtures::write_book(
+            &server.comics.join(format!("{file}.cbz")),
+            2,
+            seed as u8 + 1,
+        );
+    }
+    let comics = server.add_library().await;
+    server.add_user("Ben", &[comics]).await;
+    let ben = server.signed_in_as("Ben", PASSWORD).await;
+    let patrol_1 = server.book_named(comics, "Patrol 001").await;
+    let saga_1 = server.book_named(comics, "Saga & Co 001").await;
+
+    let new = json!({
+        "name": "Cross: over?",
+        "series": [saga_1["series_id"], patrol_1["series_id"]],
+    });
+    let list = server.post("/api/v1/reading-lists", new).await.json();
+    let at = format!("/api/v1/reading-lists/{}", list["id"]);
+    let books = format!("{at}/books");
+    let shared = json!({ "everyone": true });
+    server.put(&format!("{at}/sharing"), shared).await;
+
+    // Anyone who sees the list saves it as a CBL file, called by its name.
+    let file = ben.get(&format!("{at}/cbl")).await;
+    assert_eq!(file.status, StatusCode::OK);
+    assert_eq!(
+        file.headers[header::CONTENT_TYPE],
+        "application/xml; charset=utf-8"
+    );
+    assert_eq!(
+        file.headers[header::CONTENT_DISPOSITION],
+        "attachment; filename=\"Cross_ over_.cbl\"; filename*=UTF-8''Cross_%20over_.cbl"
+    );
+    let text = String::from_utf8(file.body.clone()).unwrap();
+    assert!(text.contains("<Name>Cross: over?</Name>"));
+    assert!(text.contains("<Book Series=\"Saga &amp; Co\" "));
+    // The import reads it back as the same books in the same order.
+    let planned = server.plan_cbl(&text).await.json();
+    assert_eq!(planned["name"], "Cross: over?");
+    assert_eq!(planned["name_taken_by"], list["id"]);
+    let read_back: Vec<&str> = planned["lines"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|line| line["book"]["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(read_back, ["Saga & Co 001", "Patrol 001", "Patrol 002"]);
+    let hidden = server.get("/api/v1/reading-lists/9999/cbl").await;
+    assert_refused(&hidden, StatusCode::NOT_FOUND, "not_found", "no such list");
+
+    // The one whose list it is takes out what they have read. What someone
+    // else read stays, and nobody else can.
+    let read_books = format!("{at}/read-books");
+    let read = json!({ "read": true, "books": [patrol_1["id"]] });
+    ben.post("/api/v1/read-marks", read.clone()).await;
+    let refused = ben.delete(&read_books).await;
+    assert_refused(&refused, StatusCode::FORBIDDEN, "forbidden", "not his");
+    let none = server.delete(&read_books).await;
+    assert_eq!(none.json(), json!({ "books": 0 }));
+    server.post("/api/v1/read-marks", read).await;
+    let removed = server.delete(&read_books).await;
+    assert_eq!(removed.status, StatusCode::OK);
+    assert_eq!(removed.json(), json!({ "books": 1 }));
+    assert_eq!(
+        server.names_at(&books).await,
+        ["Saga & Co 001", "Patrol 002"]
+    );
+}
+
+#[tokio::test]
 async fn a_cbl_file_is_matched_fixed_by_hand_and_made_into_a_list() {
     let server = server().await;
     for (seed, file) in [
@@ -2996,12 +3084,7 @@ async fn a_cbl_file_is_matched_fixed_by_hand_and_made_into_a_list() {
             <Book Series="Night Runner" Number="7" Volume="1987" Year="1988" />
           </Books>
         </ReadingList>"#;
-    let plan = async |file: &str| {
-        let request = Request::post("/api/v1/reading-lists/import")
-            .header(header::CONTENT_TYPE, "application/xml");
-        let sent = request.body(Body::from(file.to_owned())).unwrap();
-        server.send(sent).await
-    };
+    let plan = async |file: &str| server.plan_cbl(file).await;
     let found = async || {
         let planned = plan(file).await;
         assert_eq!(planned.status, StatusCode::OK);

@@ -182,6 +182,33 @@ export function useRemoveFromList(listId: number) {
 }
 
 /**
+ * Takes out of a reading list of the reader's every book they have read,
+ * and says over the page how many went. `onRemoved` runs first and the
+ * lists are refreshed after, so what asked is closed before the list is
+ * shown without them.
+ */
+export function useRemoveRead(onRemoved: () => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (list: ReadingList) =>
+      unwrap(
+        await api.DELETE("/api/v1/reading-lists/{id}/read-books", {
+          params: { path: { id: list.id } },
+        }),
+      ),
+    onSuccess: (removed, list) => {
+      onRemoved();
+      tell(
+        removed.books > 0
+          ? `Removed ${bookCount(removed.books)} from “${list.name}”.`
+          : `“${list.name}” holds nothing you have read.`,
+      );
+      return askAgainWithSearch(queryClient, LISTS);
+    },
+  });
+}
+
+/**
  * Moves a book of a reading list to a position among the books shown, from
  * 0. The page shows the new order at once and the server's when it answers.
  * Only the one whose list it is can.

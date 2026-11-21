@@ -4244,6 +4244,49 @@
         }
       }
     },
+    "/api/v1/reading-lists/{id}/cbl": {
+      "get": {
+        "tags": [
+          "lists"
+        ],
+        "summary": "Answers with a reading list as a CBL file, to save: the books the caller\nis shown, in the list's order, each named by its series, number, volume\nand year. Anyone who sees the list can.",
+        "description": "It is the file `POST /reading-lists/import` reads: an annual's series\nends in \"Annual\" and a collected edition's in \"TPB\", which is how the\nimport tells them from the issue with the same number. A book in no\nseries is left out, and a book with no number is one entry like the\nothers of its series that have none.",
+        "operationId": "exportReadingList",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The reading list",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The CBL file",
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/reading-lists/{id}/cover": {
       "put": {
         "tags": [
@@ -4404,6 +4447,58 @@
           },
           "403": {
             "description": "The caller is not the owner, or the list is not their own",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reading-lists/{id}/read-books": {
+      "delete": {
+        "tags": [
+          "lists"
+        ],
+        "summary": "Takes out of a reading list every book the caller has read to the end.\nThe others keep their order. Only the one whose list it is can, and the\nbooks go for everyone the list is shared with.",
+        "description": "A book the caller is not shown stays: one whose file is gone for now, or\nof a library they no longer read.",
+        "operationId": "removeReadFromReadingList",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The reading list",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Removed"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The list is someone else's",
             "content": {
               "application/json": {
                 "schema": {
@@ -8707,6 +8802,21 @@
           "year": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "Removed": {
+        "type": "object",
+        "description": "What taking the read books out of a list changed.",
+        "required": [
+          "books"
+        ],
+        "properties": {
+          "books": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many books the list lost.",
+            "minimum": 0
           }
         }
       },

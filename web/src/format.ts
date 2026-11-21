@@ -244,6 +244,11 @@ export function sharedWith(made: Made): string {
   return `Shared with ${namesTogether.format(made.shared_with.map((person) => person.name))}`;
 }
 
+/** Whether anyone but the one who made it sees a reading list or a collection. */
+export function isShared(made: Pick<Made, "shared_with_all" | "shared_with">): boolean {
+  return made.shared_with_all || made.shared_with.length > 0;
+}
+
 /** Whose a reading list or a collection is, for someone else's: "By Ana". Nothing for one's own. */
 export function madeBy(made: Made): string | null {
   return made.mine ? null : `By ${made.made_by.name}`;

@@ -286,6 +286,23 @@ export function MenuItem({
   );
 }
 
+/** One file to save, in a `Menu`: the browser keeps what `href` answers. */
+export function MenuDownload({
+  icon,
+  href,
+  children,
+}: {
+  icon: LucideIcon;
+  href: string;
+  children: ReactNode;
+}) {
+  return (
+    <a href={href} download className={choiceClass}>
+      <Choice icon={icon}>{children}</Choice>
+    </a>
+  );
+}
+
 /** One place to go, in a `Menu`: a link of the router, by `to` and `params`. */
 export const MenuLink = createLink(function MenuLink({
   icon,

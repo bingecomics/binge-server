@@ -744,6 +744,10 @@ replaces 0014).
 - A list is shown without the books of libraries the person does not
   read, and its count is of what they see.
 - What a person fixes by hand in a CBL import is kept as their own rule.
+- Since 2026-11-21: the one whose list it is removes from it, in one go,
+  every book they have read; and anyone who sees a list saves it as a CBL
+  file, which the import reads back. A book with no number, among several
+  such of its series, comes back as a choice to make by hand.
 
 #### P1. Collections
 

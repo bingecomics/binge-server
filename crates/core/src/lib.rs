@@ -40,7 +40,7 @@ pub use backup::{BackupError, Backups, COPIES_KEPT, DatabaseCopy};
 pub use catalog::{
     Book, Catalog, CatalogError, Group, GroupKind, HeldFile, Library, PartOf, Series, Span,
 };
-pub use cbl::{CblEntry, CblFound, CblHow, CblLine, CblPlan, CblRuleFor};
+pub use cbl::{CblEntry, CblFile, CblFound, CblHow, CblLine, CblPlan, CblRuleFor};
 pub use changes::{ChangeKind, ScanChange, ScanRecord};
 pub use collections::Collection;
 pub use comicinfo::ComicInfo;

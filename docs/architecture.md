@@ -96,7 +96,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `wanted.rs` | Want to read: the series each person means to read |
 | `from_files.rs` | The reading lists and collections a library makes from the arcs and groups its files name |
 | `sharing.rs` | What reading lists and collections share: whose a thing is, and who it is shared with |
-| `cbl.rs` | Reads a CBL file and finds the book each of its entries means |
+| `cbl.rs` | Reads a CBL file and finds the book each of its entries means; writes a reading list as one |
 | `natural.rs` | Name order where "Issue 2" comes before "Issue 10", and a name with an accent sits with its letter |
 | `fixtures.rs` | Makes small comics for tests. Compiled for tests only |
 
@@ -202,6 +202,8 @@ The routes today:
 | `GET /reading-lists/{id}/books`, `POST` | Its books in its order; the one whose list it is adds books, groups, series or other lists at its end |
 | `DELETE /reading-lists/{id}/books/{book_id}` | The one whose list it is takes a book out of it |
 | `PUT /reading-lists/{id}/books/{book_id}/position` | The one whose list it is moves a book of it to a position among the books shown |
+| `DELETE /reading-lists/{id}/read-books` | The one whose list it is takes out of it every book they have read, and is told how many |
+| `GET /reading-lists/{id}/cbl` | The list as a CBL file, of the books the caller is shown, for the browser to save |
 | `GET /books/{id}/reading-lists`, `GET /series/{id}/reading-lists` | The reading lists the caller sees that a book is in; that hold a book of a series |
 | `GET /collections?on_home=`, `POST /collections` | The collections the caller sees: their own and the ones shared with them, or only the ones that are rows on Home; anyone makes one of their own, with series in it or none |
 | `GET /collections/{id}`, `PATCH`, `DELETE` | One collection; the one whose it is gives it another name and summary; deletes it |
@@ -760,6 +762,11 @@ it, and they share it with the people they choose or with everyone
   among the books the caller is shown, from 0, and the server puts the book
   before the one shown there now, or after the last. Books that are not
   shown keep their neighbours. New books go to the end.
+- **Taking out what was read.** `DELETE …/read-books` takes out every book
+  the maker has read to the end, among the ones they are shown, and
+  answers with how many. What someone else read does not count: the list
+  is its maker's, and so is what leaves it. The books go for everyone the
+  list is shared with.
 - **Naming what to add.** Adding to a list, making one with books in it,
   and `POST /read-marks` name books the same way: `books`, `groups`,
   `series` and `lists`, each a list of ids. For a reading list the order
@@ -776,6 +783,19 @@ it, and they share it with the people they choose or with everyone
   cover was chosen. The web app shows them when there are four. A chosen
   cover is shown to everyone who sees the list, whichever book its page is
   from. Choosing one is the owner's, for a list of their own.
+
+**A list is written as a CBL file** by `GET /reading-lists/{id}/cbl`, for
+anyone who sees it: its name, and an entry for each book the caller is
+shown, in the list's order. An entry names the book's series, its number,
+the number of its volume and the year it came out: what the import tells
+books apart by. An annual's series ends in "Annual" and a collected
+edition's in "TPB", which is how the import tells them from the issue
+with the same number. The file is named after the list and is not kept on
+the server. The import below reads a list written here back as the same
+books where an entry is enough to name one. A book with no number among
+several of its series, as one-shots and collected editions often are, is
+not told apart by an entry: the import answers `several` for it, with the
+book among the choices, and never another book.
 
 **Importing a CBL file** is a dry run. A CBL file is XML that names a list
 and its entries, each a series, a number, a volume and a year.
@@ -821,7 +841,10 @@ place, which is the way on a touch screen. "Add to a reading list…" is in
 the menu of every book, group, series and list and in the bar of what is
 picked, for everyone; one dialog, mounted in the frame, asks which of the
 person's own lists or the name of a new one. `/lists/import` shows the plan as a table with a button on each
-line to say what the entry is. A book's page says which lists it is in.
+line to say what the entry is. The menu of a list's page has "Export as
+CBL" for everyone who sees the list and, for its maker while it holds a
+book they have read, "Remove read books…", which says how many will go
+and asks first. A book's page says which lists it is in.
 
 ### Collections
 

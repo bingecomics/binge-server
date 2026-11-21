@@ -5,11 +5,14 @@
 //! everyone. Each person sees of a list the books they may read. A change
 //! does exactly what was asked or is refused with the reason.
 
+use std::fmt::Write as _;
+
 use axum::Json;
 use axum::body::Bytes;
 use axum::extract::rejection::BytesRejection;
 use axum::extract::{DefaultBodyLimit, Path, State};
-use axum::http::StatusCode;
+use axum::http::{StatusCode, header};
+use axum::response::{IntoResponse, Response};
 use binge_core::CblRuleFor;
 use binge_core::cbl::{self, BIGGEST_FILE};
 use serde::{Deserialize, Serialize};
@@ -34,7 +37,9 @@ pub(super) fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(share))
         .routes(routes!(books, add_books))
         .routes(routes!(remove_book))
+        .routes(routes!(remove_read))
         .routes(routes!(move_book))
+        .routes(routes!(export))
         .routes(routes!(lists_of_book))
         .routes(routes!(lists_of_series))
         .routes(routes!(keep_rule))
@@ -203,6 +208,13 @@ impl From<Sharing> for binge_core::Sharing {
             people: sharing.people.into_iter().map(binge_core::UserId).collect(),
         }
     }
+}
+
+/// What taking the read books out of a list changed.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct Removed {
+    /// How many books the list lost.
+    pub books: u64,
 }
 
 /// What adding books to a list changed.
@@ -477,6 +489,106 @@ async fn remove_book(
         .remove_from_list(caller.user.id, id, book_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Takes out of a reading list every book the caller has read to the end.
+/// The others keep their order. Only the one whose list it is can, and the
+/// books go for everyone the list is shared with.
+///
+/// A book the caller is not shown stays: one whose file is gone for now, or
+/// of a library they no longer read.
+#[utoipa::path(
+    delete,
+    path = "/reading-lists/{id}/read-books",
+    tag = "lists",
+    operation_id = "removeReadFromReadingList",
+    params(("id" = i64, Path, description = "The reading list")),
+    responses(
+        (status = OK, body = Removed),
+        (status = FORBIDDEN, description = "The list is someone else's", body = ApiError),
+        (status = NOT_FOUND, body = ApiError),
+    )
+)]
+async fn remove_read(
+    State(state): State<AppState>,
+    caller: Caller,
+    Path(id): Path<i64>,
+) -> Result<Json<Removed>, ApiError> {
+    let books = state
+        .catalog
+        .remove_read_from_list(caller.user.id, id)
+        .await?;
+    Ok(Json(Removed { books }))
+}
+
+/// What has a browser save an answer as a file called `name`, with the
+/// ending given. The name is said twice, as browsers ask: once in plain
+/// letters, and once whole.
+fn saved_as(name: &str, ending: &str) -> String {
+    // What no file system takes in a name.
+    let name: String = name
+        .chars()
+        .map(|sign| match sign {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            sign if sign.is_control() => '_',
+            sign => sign,
+        })
+        .collect();
+    let plain: String = name
+        .chars()
+        .map(|sign| match sign {
+            sign if sign.is_ascii_alphanumeric() => sign,
+            ' ' | '-' | '_' | '.' | '(' | ')' => sign,
+            _ => '_',
+        })
+        .collect();
+    let mut whole = String::with_capacity(name.len());
+    for byte in name.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                whole.push(char::from(byte));
+            }
+            // Writing to a `String` cannot fail.
+            byte => _ = write!(whole, "%{byte:02X}"),
+        }
+    }
+    format!("attachment; filename=\"{plain}.{ending}\"; filename*=UTF-8''{whole}.{ending}")
+}
+
+/// Answers with a reading list as a CBL file, to save: the books the caller
+/// is shown, in the list's order, each named by its series, number, volume
+/// and year. Anyone who sees the list can.
+///
+/// It is the file `POST /reading-lists/import` reads: an annual's series
+/// ends in "Annual" and a collected edition's in "TPB", which is how the
+/// import tells them from the issue with the same number. A book in no
+/// series is left out, and a book with no number is one entry like the
+/// others of its series that have none.
+#[utoipa::path(
+    get,
+    path = "/reading-lists/{id}/cbl",
+    tag = "lists",
+    operation_id = "exportReadingList",
+    params(("id" = i64, Path, description = "The reading list")),
+    responses(
+        (status = OK, description = "The CBL file", content_type = "application/xml", body = String),
+        (status = NOT_FOUND, body = ApiError),
+    )
+)]
+async fn export(
+    State(state): State<AppState>,
+    caller: Caller,
+    Path(id): Path<i64>,
+) -> Result<Response, ApiError> {
+    let file = state.catalog.list_as_cbl(caller.user.id, id).await?;
+    let headers = [
+        (
+            header::CONTENT_TYPE,
+            "application/xml; charset=utf-8".to_owned(),
+        ),
+        (header::CONTENT_DISPOSITION, saved_as(&file.name, "cbl")),
+    ];
+    Ok((headers, file.text).into_response())
 }
 
 /// Moves a book of a reading list to another position in it. The other
