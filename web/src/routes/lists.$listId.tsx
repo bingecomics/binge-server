@@ -14,14 +14,14 @@ import { BooksHeader } from "../components/BooksHeader";
 import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CoverChoices } from "../components/CoverChoices";
+import { madeAndShared } from "../components/FromFiles";
 import { ListBooks } from "../components/ListBooks";
 import { MenuItem } from "../components/Menu";
 import { NameAndSummaryDialog } from "../components/NameAndSummary";
 import { NotOnServer, ServerNotAnswering } from "../components/Notice";
 import { BooksMenu } from "../components/ReadMarks";
 import { ShareDialog } from "../components/ShareDialog";
-import { ErrorText, textLinkClass, upLinkClass } from "../components/text";
-import { sharedWith } from "../format";
+import { ErrorText, upLinkClass } from "../components/text";
 
 export const Route = createFileRoute("/lists/$listId")({
   params: {
@@ -82,13 +82,14 @@ function ListPage() {
         overview={overview.data}
         listId={list.id}
         whose={
-          canShare ? (
-            <button type="button" className={textLinkClass} onClick={() => setSharing(true)}>
-              {sharedWith(list)}
-            </button>
-          ) : mine ? null : (
-            `${list.made_by.name}’s list`
-          )
+          mine
+            ? madeAndShared({
+                made: list,
+                what: "books",
+                canShare,
+                onShare: () => setSharing(true),
+              })
+            : `${list.made_by.name}’s list`
         }
         menu={
           <BooksMenu about={list.name} what={{ lists: [list.id] }} unreadCount={list.unread_count}>

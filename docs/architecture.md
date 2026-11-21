@@ -95,6 +95,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `lists.rs` | Reading lists: books of any series in a chosen order |
 | `collections.rs` | Collections: series picked by hand, from any library |
 | `wanted.rs` | Want to read: the series each person means to read |
+| `from_files.rs` | The reading lists and collections a library makes from the arcs and groups its files name |
 | `sharing.rs` | What reading lists and collections share: whose a thing is, and who it is shared with |
 | `cbl.rs` | Reads a CBL file and finds the book each of its entries means |
 | `natural.rs` | Name order where "Issue 2" comes before "Issue 10", and a name with an accent sits with its letter |
@@ -150,6 +151,7 @@ The routes today:
 | `GET /users`, `POST /users`, `PATCH /users/{id}`, `DELETE /users/{id}` | The owner manages the other users and what they may read. Session only |
 | `GET /libraries`, `POST /libraries` | List the libraries the caller may read, with the state of their scan; the owner adds one by folder path |
 | `GET /libraries/{id}`, `DELETE /libraries/{id}` | One library; the owner removes it from the server (files are not touched) |
+| `PUT /libraries/{id}/from-files` | The owner says what the library makes from what its files say: reading lists, collections, both or neither |
 | `POST /libraries/{id}/scan` | The owner starts a scan. Answers at once; the scan runs in the background |
 | `GET /libraries/{id}/series` | A part of the series of a library, in the order asked for and narrowed by read state, publisher, year, writer and penciller |
 | `GET /libraries/{id}/series/letters` | The first letters the names of those series have, each with how many and where its first series is |
@@ -430,7 +432,10 @@ file. It belongs to the file, not to the identity: two files with the same
 pages may say different things, and retagging a file changes what is kept
 at the next scan without touching its pages, cover or progress.
 
-The API gives it as a book's `info`. It is a copy that only follows the
+The arcs and the groups of series a file names are kept apart: see
+"Lists and collections from the files".
+
+The API gives `book_info` as a book's `info`. It is a copy that only follows the
 file: nobody edits it. The server reads it once more, to place a book it has
 not seen before, and never again for that. The web UI shows it in two
 places:
@@ -873,6 +878,40 @@ uses, 120 to a page, and Home has the first 24 as a row. The menu of a series of
 want to read", or "Remove from want to read" once it is on it, and the
 bar of what is picked puts several there while only series are picked.
 
+### Lists and collections from the files
+
+A library makes reading lists and collections from what its files say
+when its owner asks it to
+([ADR 0024](adr/0024-a-library-makes-lists-and-collections-from-what-its-files-say.md)).
+
+- **What is kept.** The scan keeps, for every file, the arcs it names
+  with the book's number in each (`book_arc`, from `StoryArc` with
+  `StoryArcNumber` and from `AlternateSeries` with `AlternateNumber`)
+  and the groups of series it names (`book_series_group`, from
+  `SeriesGroup`). They belong to the file, as `book_info` does.
+- **The choice.** `library.lists_from_files` and
+  `library.collections_from_files`, off until the owner turns them on.
+  The API gives them to the owner as a library's `from_files`.
+- **What is made.** A reading list for each arc and a collection for
+  each group, the owner's and shared with everyone. `from_files` on the
+  row is the name the files fill it under, so it is found again after
+  its owner renames it. A list or a collection of the owner's that
+  already has the name is filled, and stays one made by hand.
+- **When.** A row of `book_arc` or `book_series_group` is `waiting`
+  from when its file is read until it was put where it goes. The end of
+  a scan's first pass does that for what waits in the library, and
+  turning a choice on does it at once for all the library's files say.
+  A book goes in a list where its number in the arc says among the
+  books there, and a series goes in a collection the first time one of
+  its books names the group. Nothing is taken out and nothing there is
+  moved. One that is not there is made whole, from every file that names
+  it. Each list and each collection is written by itself, so a scan that
+  stops leaves the rest waiting for the next.
+
+**In the web app.** Adding a library asks for both, ticked. The menu of
+a library and its row in Settings open the same two choices. The page of
+a list or a collection the files made says so to its owner.
+
 ## Reading and progress
 
 **Pages.** `GET /books/{id}/pages` lists a book's pages with the width and
@@ -1278,3 +1317,4 @@ Listed here so the parts above make sense. Details are in
 | [0021](adr/0021-a-reading-list-is-its-makers-to-share.md) | A reading list is its maker's, to share |
 | [0022](adr/0022-a-collection-holds-series-and-is-shared-as-a-list-is.md) | A collection holds series, and is shared as a list is |
 | [0023](adr/0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md) | Want to read is a person's own, and leaves out what was read |
+| [0024](adr/0024-a-library-makes-lists-and-collections-from-what-its-files-say.md) | A library makes lists and collections from what its files say |

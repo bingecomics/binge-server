@@ -13,14 +13,15 @@ import {
 } from "../api/collections";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { coverGridClass } from "../components/Cover";
+import { madeAndShared } from "../components/FromFiles";
 import { MenuItem, MoreMenu } from "../components/Menu";
 import { NameAndSummaryDialog } from "../components/NameAndSummary";
 import { NotOnServer, ServerNotAnswering } from "../components/Notice";
 import { BooksMenu } from "../components/ReadMarks";
 import { SeriesCard } from "../components/SeriesCard";
 import { ShareDialog } from "../components/ShareDialog";
-import { ErrorText, textLinkClass, upLinkClass } from "../components/text";
-import { books as bookCount, seriesCount, sharedWith } from "../format";
+import { ErrorText, upLinkClass } from "../components/text";
+import { books as bookCount, seriesCount } from "../format";
 
 export const Route = createFileRoute("/collections/$collectionId")({
   params: {
@@ -117,6 +118,12 @@ function CollectionPage() {
       </MenuItem>
     </>
   ) : null;
+  const whose = madeAndShared({
+    made: collection,
+    what: "series",
+    canShare,
+    onShare: () => setSharing(true),
+  });
   return (
     <>
       <header className="mb-8">
@@ -132,13 +139,11 @@ function CollectionPage() {
             <p className="mt-2 text-fg-muted text-metadata">
               {seriesCount(collection.series_count)} · {bookCount(collection.book_count)}
             </p>
-            {canShare ? (
-              <p className="mt-1 text-fg-muted text-metadata">
-                <button type="button" className={textLinkClass} onClick={() => setSharing(true)}>
-                  {sharedWith(collection)}
-                </button>
-              </p>
-            ) : mine ? null : (
+            {mine ? (
+              whose ? (
+                <p className="mt-1 text-fg-muted text-metadata">{whose}</p>
+              ) : null
+            ) : (
               <p className="mt-1 text-fg-muted text-metadata">
                 {collection.made_by.name}’s collection
               </p>

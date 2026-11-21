@@ -4069,3 +4069,91 @@ async fn want_to_read_is_each_persons_own() {
     assert_eq!(server.get(&of_saga).await.json()["wanted"], false);
     assert_eq!(server.delete(&off_saga).await.status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn a_library_makes_lists_and_collections_from_its_files_when_asked() {
+    let server = server().await;
+    for (seed, file, said) in [
+        (
+            1,
+            "Patrol/Patrol 001",
+            &[("StoryArc", "Siege"), ("StoryArcNumber", "2")][..],
+        ),
+        (
+            2,
+            "Saga/Saga 001",
+            &[("StoryArc", "Siege"), ("StoryArcNumber", "1")],
+        ),
+        (3, "Saga/Saga 002", &[("SeriesGroup", "Space Opera")]),
+    ] {
+        let path = server.comics.join(format!("{file}.cbz"));
+        fixtures::write_tagged_book(&path, seed, said);
+    }
+
+    // Added without saying so, a library makes nothing, and says so to its
+    // owner.
+    let id = server.add_library().await;
+    let library = format!("/api/v1/libraries/{id}");
+    let nothing = json!({ "lists": false, "collections": false });
+    assert_eq!(server.get(&library).await.json()["from_files"], nothing);
+    assert_eq!(server.get("/api/v1/reading-lists").await.json(), json!([]));
+    assert_eq!(server.get("/api/v1/collections").await.json(), json!([]));
+
+    // Asked to, it makes them at once from what the scan kept.
+    let from_files = format!("{library}/from-files");
+    let both = json!({ "lists": true, "collections": true });
+    let made = server.put(&from_files, both.clone()).await;
+    assert_eq!(made.status, StatusCode::OK);
+    assert_eq!(made.json()["from_files"], both);
+
+    let lists = server.get("/api/v1/reading-lists").await.json();
+    assert_eq!(lists.as_array().unwrap().len(), 1);
+    assert_eq!(lists[0]["name"], "Siege");
+    assert_eq!(lists[0]["from_files"], true);
+    assert_eq!(lists[0]["shared_with_all"], true);
+    let books = format!("/api/v1/reading-lists/{}/books", lists[0]["id"]);
+    assert_eq!(server.names_at(&books).await, ["Saga 001", "Patrol 001"]);
+
+    let collections = server.get("/api/v1/collections").await.json();
+    assert_eq!(collections.as_array().unwrap().len(), 1);
+    assert_eq!(collections[0]["name"], "Space Opera");
+    assert_eq!(collections[0]["from_files"], true);
+    assert_eq!(collections[0]["series_count"], 1);
+
+    // A member reads what was made, is not told what the library makes,
+    // and may not change it.
+    server.add_user("Cleo", &[id]).await;
+    let cleo = server.signed_in_as("Cleo", PASSWORD).await;
+    assert_eq!(
+        cleo.get("/api/v1/reading-lists").await.json()[0]["name"],
+        "Siege"
+    );
+    assert_eq!(cleo.get(&library).await.json()["from_files"], Value::Null);
+    let refused = cleo.put(&from_files, nothing.clone()).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+
+    // A library added saying so makes them with its first scan.
+    let elsewhere = tempfile::tempdir().unwrap();
+    let path = elsewhere.path().join("Lone/Lone 001.cbz");
+    fixtures::write_tagged_book(
+        &path,
+        9,
+        &[("AlternateSeries", "Siege"), ("AlternateNumber", "3")],
+    );
+    let new =
+        json!({ "path": elsewhere.path(), "from_files": { "lists": true, "collections": false } });
+    let added = server.post("/api/v1/libraries", new).await;
+    assert_eq!(added.status, StatusCode::CREATED);
+    assert_eq!(added.json()["from_files"]["lists"], true);
+    server
+        .catalog
+        .scan_finished(added.json()["id"].as_i64().unwrap())
+        .await;
+    let siege = ["Saga 001", "Patrol 001", "Lone 001"];
+    assert_eq!(server.names_at(&books).await, siege);
+
+    let missing = server
+        .put("/api/v1/libraries/999/from-files", nothing)
+        .await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+}

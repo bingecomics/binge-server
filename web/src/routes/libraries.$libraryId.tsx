@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useLocation, useNavigate } from "@tanstack/react-router";
-import { Bookmark, Copy, FolderSearch, History, RefreshCw, Trash2 } from "lucide-react";
+import { Bookmark, Copy, FolderSearch, History, RefreshCw, Tags, Trash2 } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { useIsOwner } from "../api/account";
 import type { Book } from "../api/client";
@@ -16,6 +16,7 @@ import { UNREADABLE_FILES } from "../components/Activity";
 import { choiceProps } from "../components/BookGrid";
 import { Button } from "../components/Button";
 import { coverGridClass } from "../components/Cover";
+import { FromFilesDialog } from "../components/FromFiles";
 import { LetterBar, letterIn } from "../components/LetterBar";
 import { MenuItem, MenuLink, MoreMenu } from "../components/Menu";
 import { Narrowing } from "../components/Narrowing";
@@ -286,6 +287,7 @@ function LibraryPage() {
   const isOwner = useIsOwner();
   const navigate = useNavigate();
   const [removing, setRemoving] = useState(false);
+  const [making, setMaking] = useState(false);
 
   if (isPending) {
     return null;
@@ -337,6 +339,9 @@ function LibraryPage() {
             >
               What scans changed
             </MenuLink>
+            <MenuItem icon={Tags} onSelect={() => setMaking(true)}>
+              Make from the files…
+            </MenuItem>
             <MenuItem icon={Trash2} onSelect={() => setRemoving(true)}>
               Remove library
             </MenuItem>
@@ -365,6 +370,7 @@ function LibraryPage() {
         />
       </div>
 
+      <FromFilesDialog library={library} open={making} onClose={() => setMaking(false)} />
       <RemoveLibraryDialog
         library={library}
         open={removing}

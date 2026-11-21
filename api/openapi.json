@@ -1760,6 +1760,68 @@
         }
       }
     },
+    "/api/v1/libraries/{id}/from-files": {
+      "put": {
+        "tags": [
+          "libraries"
+        ],
+        "summary": "Says what a library makes from what its files say from now on. Only the\nowner can.",
+        "description": "What is turned on is made at once, from what the last scan found the\nfiles to say. What is turned off makes nothing more: the reading lists\nand collections there are stay.",
+        "operationId": "makeFromFiles",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The library",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FromFiles"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Library"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/libraries/{id}/scan": {
       "post": {
         "tags": [
@@ -7114,7 +7176,8 @@
           "made_by",
           "mine",
           "shared_with_all",
-          "shared_with"
+          "shared_with",
+          "from_files"
         ],
         "properties": {
           "book_count": {
@@ -7135,6 +7198,10 @@
               "type": "string"
             },
             "description": "The covers to show together as one: those of its first series, four\ndifferent ones at most."
+          },
+          "from_files": {
+            "type": "boolean",
+            "description": "Whether the files of a library made it, from a group of series they\nname. It is a collection like any other: its owner changes and\ndeletes it. The files go on putting the series that name the group\nin it."
           },
           "id": {
             "type": "integer",
@@ -7376,6 +7443,25 @@
           "group",
           "series"
         ]
+      },
+      "FromFiles": {
+        "type": "object",
+        "description": "What a library makes from what its files say. What it makes is the\nowner's, shared with everyone, and from then on a reading list or a\ncollection like any other. A scan adds what the files it read name, and\ntakes nothing out. No file is changed.",
+        "required": [
+          "lists",
+          "collections"
+        ],
+        "properties": {
+          "collections": {
+            "type": "boolean",
+            "description": "A collection of each group of series the files name\n(`SeriesGroup`)."
+          },
+          "lists": {
+            "type": "boolean",
+            "description": "A reading list of each story arc the files name (`StoryArc` with\n`StoryArcNumber`, and `AlternateSeries` with `AlternateNumber`), its\nbooks in the order those numbers give."
+          }
+        },
+        "additionalProperties": false
       },
       "Group": {
         "type": "object",
@@ -7627,6 +7713,17 @@
           "book_count": {
             "type": "integer",
             "format": "int64"
+          },
+          "from_files": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FromFiles",
+                "description": "What it makes from what its files say. Only the owner is told."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "id": {
             "type": "integer",
@@ -7897,6 +7994,17 @@
           "path"
         ],
         "properties": {
+          "from_files": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/FromFiles",
+                "description": "What it makes from what its files say. Left out, it makes nothing\nuntil it is asked to."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "name": {
             "type": [
               "string",
@@ -8567,7 +8675,8 @@
           "made_by",
           "mine",
           "shared_with_all",
-          "shared_with"
+          "shared_with",
+          "from_files"
         ],
         "properties": {
           "book_count": {
@@ -8600,6 +8709,10 @@
             ],
             "format": "int64",
             "description": "The earliest year its books came out."
+          },
+          "from_files": {
+            "type": "boolean",
+            "description": "Whether the files of a library made it, from a story arc they name.\nIt is a list like any other: its owner changes and deletes it. The\nfiles go on putting the books that name the arc in it."
           },
           "id": {
             "type": "integer",

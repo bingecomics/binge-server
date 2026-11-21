@@ -11,7 +11,8 @@ use std::collections::{HashMap, HashSet};
 use sqlx::{SqliteConnection, SqliteExecutor, SqlitePool};
 
 use crate::accounts::{UserId, UserName};
-use crate::catalog::CatalogError;
+use crate::catalog::{CatalogError, now};
+use crate::layout::a_name;
 use crate::reading::list;
 
 /// What sharing with someone who is not there is refused with.
@@ -59,7 +60,9 @@ pub struct Sharing {
 /// A kind of thing that is made and shared, by where it is kept.
 pub(crate) struct Kind {
     /// The table of the things. Each has an `id`, the `user_id` of the one
-    /// who made it, a `name_key` and `shared_with_all`.
+    /// who made it, a `name`, a `name_key`, `shared_with_all`, when it was
+    /// made (`created_at`), and `from_files`: the name the files fill it
+    /// under, for one they made.
     pub table: &'static str,
     /// The table of the people a thing is shared with one by one, each row
     /// with a `user_id`.
@@ -100,6 +103,50 @@ impl Kind {
             .bind(name_key)
             .fetch_optional(db)
             .await?)
+    }
+
+    /// The thing of `user` that the files fill under a name, made when it
+    /// is not there, and whether it was made just now. It is the one the
+    /// files made from that name, whatever it is called now, or else the
+    /// one of that name. One that is made is called `name` and shared with
+    /// everyone. Nothing when it is not there and `name` cannot be one.
+    pub(crate) async fn filled_by_files(
+        &self,
+        tx: &mut SqliteConnection,
+        user: UserId,
+        name_key: &str,
+        name: &str,
+    ) -> Result<Option<(i64, bool)>, CatalogError> {
+        let find = format!(
+            "SELECT id FROM {} WHERE user_id = ?1 AND (from_files = ?2 OR name_key = ?2) \
+             ORDER BY from_files IS ?2 DESC LIMIT 1",
+            self.table
+        );
+        let found: Option<i64> = sqlx::query_scalar(&find)
+            .bind(user)
+            .bind(name_key)
+            .fetch_optional(&mut *tx)
+            .await?;
+        if let Some(id) = found {
+            return Ok(Some((id, false)));
+        }
+        // What a file says may be too long to be a name.
+        let Ok(name) = a_name(name, "") else {
+            return Ok(None);
+        };
+        let make = format!(
+            "INSERT INTO {} (user_id, name, name_key, from_files, shared_with_all, created_at) \
+             VALUES (?1, ?2, ?3, ?3, 1, ?4) RETURNING id",
+            self.table
+        );
+        let id = sqlx::query_scalar(&make)
+            .bind(user)
+            .bind(name)
+            .bind(name_key)
+            .bind(now())
+            .fetch_one(&mut *tx)
+            .await?;
+        Ok(Some((id, true)))
     }
 
     /// Whether a thing `user` sees is their own. One they may not see is

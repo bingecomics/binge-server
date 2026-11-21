@@ -593,7 +593,10 @@ mod tests {
         let db = Database::open(&data.join("binge.db")).await.unwrap();
         let owner = accounts::testing::owner(&db).await;
         let catalog = Catalog::new(db, &data);
-        let library = catalog.add_library(owner, &comics, None).await.unwrap();
+        let library = catalog
+            .add_library(owner, &comics, None, crate::FromFiles::default())
+            .await
+            .unwrap();
         catalog.scan_finished(library.id).await;
         Shelf {
             comics,
@@ -849,7 +852,12 @@ mod tests {
             .unwrap();
         let library = shelf
             .catalog
-            .add_library(shelf.owner, &shelf.comics, None)
+            .add_library(
+                shelf.owner,
+                &shelf.comics,
+                None,
+                crate::FromFiles::default(),
+            )
             .await
             .unwrap();
         shelf.catalog.scan_finished(library.id).await;
@@ -955,7 +963,10 @@ mod tests {
         // The same pages in a second library, the only one Ben may read.
         let lent = shelf.comics.parent().unwrap().join("Lent");
         fixtures::write_book(&lent.join("Lent book.cbz"), 2, 1);
-        let lent = catalog.add_library(owner, &lent, None).await.unwrap();
+        let lent = catalog
+            .add_library(owner, &lent, None, crate::FromFiles::default())
+            .await
+            .unwrap();
         catalog.scan_finished(lent.id).await;
         let ben = accounts::testing::member(&catalog.db, "Ben", &[lent.id]).await;
         let (first, copy) = (shelf.book("Book").await, shelf.book("Lent book").await);
@@ -1093,7 +1104,10 @@ mod tests {
         let copies = shelf.comics.parent().unwrap().join("Copies");
         fixtures::write_book(&copies.join("Fables/Fables 1 again.cbz"), 2, 4);
         fixtures::write_book(&copies.join("Fables/Fables 2 again.cbz"), 2, 5);
-        let copies = shelf.catalog.add_library(shelf.owner, &copies, None);
+        let copies =
+            shelf
+                .catalog
+                .add_library(shelf.owner, &copies, None, crate::FromFiles::default());
         shelf.catalog.scan_finished(copies.await.unwrap().id).await;
         let offered = next().await;
         assert_eq!(offered.len(), 2);

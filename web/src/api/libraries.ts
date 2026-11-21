@@ -6,7 +6,14 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { type Asked, lettersQuery, seriesQuery } from "../narrowing";
-import { api, type ChangeKind, type Library, type NewLibrary, unwrap } from "./client";
+import {
+  api,
+  type ChangeKind,
+  type FromFiles,
+  type Library,
+  type NewLibrary,
+  unwrap,
+} from "./client";
 
 export function isScanning(library: Library | undefined): boolean {
   return library !== undefined && library.scan.phase !== "idle";
@@ -294,6 +301,29 @@ export function useAddLibrary() {
       unwrap(await api.POST("/api/v1/libraries", { body: library })),
     // Waits for the list, so the new library's page finds it there.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: LIBRARIES }),
+  });
+}
+
+/**
+ * Says what a library makes from what its files say. What is turned on is
+ * made at once, so the reading lists and the collections are asked for
+ * again: they are among what a library holds.
+ */
+export function useMakeFromFiles() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, from }: { id: number; from: FromFiles }) =>
+      unwrap(
+        await api.PUT("/api/v1/libraries/{id}/from-files", {
+          params: { path: { id } },
+          body: from,
+        }),
+      ),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: LIBRARIES }),
+        queryClient.invalidateQueries({ queryKey: CONTENTS }),
+      ]),
   });
 }
 

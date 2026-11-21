@@ -11,6 +11,7 @@ use crate::accounts::UserId;
 use crate::archive::ArchiveError;
 use crate::comicinfo::ComicInfo;
 use crate::db::Database;
+use crate::from_files::FromFiles;
 use crate::reading::{MOST_NAMED, Progress, TOO_MANY_NAMED, list};
 use crate::scan::{Scan, analysis_workers};
 use crate::thumbnail::Thumbnails;
@@ -196,6 +197,12 @@ pub struct Library {
     pub unreadable_count: i64,
     /// How many of them were set aside.
     pub set_aside_count: i64,
+    /// Whether it makes reading lists from the story arcs its files name:
+    /// see [`crate::from_files`].
+    pub lists_from_files: bool,
+    /// Whether it makes collections from the groups of series its files
+    /// name.
+    pub collections_from_files: bool,
 }
 
 /// A series of a library: the books that go by one name. It is Binge's own
@@ -368,6 +375,7 @@ const UNREADABLE: &str = "b.content_hash IS NULL";
 fn libraries(rest: &str) -> String {
     format!(
         "SELECT l.id, l.name, l.root_path, l.last_scanned_at, \
+         l.lists_from_files, l.collections_from_files, \
          (SELECT COUNT(*) FROM series s WHERE s.library_id = l.id) AS series_count, \
          (SELECT COUNT(*) FROM book b WHERE b.library_id = l.id) AS book_count, \
          (SELECT COUNT(*) FROM book b WHERE b.library_id = l.id AND {UNREADABLE} \
@@ -591,13 +599,15 @@ impl Catalog {
     }
 
     /// Adds the folder at `path` as a library and starts scanning it. Without
-    /// a name, the library is called after the folder. `owner` is who adds
-    /// it, and gets it back as they see it.
+    /// a name, the library is called after the folder. `from` is what it
+    /// makes from what its files say. `owner` is who adds it, and gets it
+    /// back as they see it.
     pub async fn add_library(
         &self,
         owner: UserId,
         path: &Path,
         name: Option<&str>,
+        from: FromFiles,
     ) -> Result<Library, CatalogError> {
         let invalid = |message: &str| CatalogError::InvalidPath(message.to_owned());
         if !path.is_absolute() {
@@ -630,11 +640,14 @@ impl Catalog {
             .unwrap_or(root_path);
 
         let added = sqlx::query_scalar::<_, i64>(
-            "INSERT INTO library (name, root_path, created_at) VALUES (?, ?, ?) RETURNING id",
+            "INSERT INTO library (name, root_path, created_at, lists_from_files, \
+             collections_from_files) VALUES (?, ?, ?, ?, ?) RETURNING id",
         )
         .bind(name)
         .bind(root_path)
         .bind(now())
+        .bind(from.lists)
+        .bind(from.collections)
         .fetch_one(self.db.pool())
         .await;
         let id = match added {
@@ -914,7 +927,9 @@ mod tests {
             &dir.path().join("missing"),
             &comics.join("One.cbz"),
         ] {
-            let refused = catalog.add_library(owner, bad, None).await;
+            let refused = catalog
+                .add_library(owner, bad, None, crate::FromFiles::default())
+                .await;
             assert!(
                 matches!(refused, Err(CatalogError::InvalidPath(_))),
                 "{bad:?}"
@@ -932,17 +947,24 @@ mod tests {
         std::fs::create_dir_all(&manga).unwrap();
 
         let first = catalog
-            .add_library(owner, &comics, Some("  "))
+            .add_library(owner, &comics, Some("  "), crate::FromFiles::default())
             .await
             .unwrap();
         assert_eq!(first.name, "Comics");
         let second = catalog
-            .add_library(owner, &manga, Some(" Tankobon "))
+            .add_library(
+                owner,
+                &manga,
+                Some(" Tankobon "),
+                crate::FromFiles::default(),
+            )
             .await
             .unwrap();
         assert_eq!(second.name, "Tankobon");
 
-        let again = catalog.add_library(owner, &comics, None).await;
+        let again = catalog
+            .add_library(owner, &comics, None, crate::FromFiles::default())
+            .await;
         assert!(matches!(again, Err(CatalogError::AlreadyAdded)));
         let names: Vec<_> = catalog
             .libraries(owner)

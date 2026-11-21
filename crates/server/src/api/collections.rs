@@ -60,6 +60,11 @@ pub struct Collection {
     /// The people it is shared with one by one, in name order. Only the one
     /// whose collection it is is told: it is empty for anyone else.
     pub shared_with: Vec<UserName>,
+    /// Whether the files of a library made it, from a group of series they
+    /// name. It is a collection like any other: its owner changes and
+    /// deletes it. The files go on putting the series that name the group
+    /// in it.
+    pub from_files: bool,
 }
 
 impl From<binge_core::Collection> for Collection {
@@ -81,6 +86,7 @@ impl From<binge_core::Collection> for Collection {
                 .into_iter()
                 .map(UserName::from)
                 .collect(),
+            from_files: collection.from_files,
         }
     }
 }

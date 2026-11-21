@@ -61,6 +61,9 @@ pub struct ReadingList {
     /// The people it is shared with one by one, by name. Only the one whose
     /// list it is is told: for anyone else there are none here.
     pub shared_with: Vec<UserName>,
+    /// Whether the files of a library made it, from a story arc they name:
+    /// see [`crate::from_files`].
+    pub from_files: bool,
 }
 
 /// A reading list seen whole, for one reader.
@@ -99,7 +102,8 @@ pub(crate) const LISTS: Kind = Kind {
 pub(crate) fn lists(rest: &str) -> String {
     format!(
         "SELECT rl.id, rl.name, rl.summary, lc.cover AS chosen, rl.user_id, \
-         maker.name AS made_by, rl.user_id = ?1 AS mine, rl.shared_with_all \
+         maker.name AS made_by, rl.user_id = ?1 AS mine, rl.shared_with_all, \
+         rl.from_files IS NOT NULL AS from_files \
          FROM reading_list rl JOIN user maker ON maker.id = rl.user_id \
          LEFT JOIN reading_list_cover lc ON lc.list_id = rl.id WHERE {} {rest}",
         may_see("rl.id")
@@ -117,6 +121,7 @@ pub(crate) struct Row {
     made_by: String,
     mine: bool,
     shared_with_all: bool,
+    from_files: bool,
 }
 
 /// What a list's summary is worked out from: one row for each file that
@@ -161,6 +166,7 @@ impl ReadingList {
             mine: row.mine,
             shared_with_all: row.shared_with_all,
             shared_with,
+            from_files: row.from_files,
         }
     }
 }
@@ -200,6 +206,34 @@ async fn append(
         }
     }
     Ok(added)
+}
+
+/// Writes the order of a list's books: each of `order` at its place, from
+/// 0. `before` is where the books the list holds are now: the ones that
+/// stay there are not written again, and a book it does not hold is added.
+pub(crate) async fn set_order<'a>(
+    tx: &mut SqliteConnection,
+    list_id: i64,
+    before: &HashMap<&str, i64>,
+    order: impl Iterator<Item = &'a str>,
+) -> Result<(), sqlx::Error> {
+    for (place, identity) in order.enumerate() {
+        let place = place as i64;
+        // Most books stay where they were.
+        if before.get(identity) == Some(&place) {
+            continue;
+        }
+        sqlx::query(
+            "INSERT INTO reading_list_book (list_id, content_hash, position) VALUES (?, ?, ?) \
+             ON CONFLICT (list_id, content_hash) DO UPDATE SET position = excluded.position",
+        )
+        .bind(list_id)
+        .bind(identity)
+        .bind(place)
+        .execute(&mut *tx)
+        .await?;
+    }
+    Ok(())
 }
 
 impl Catalog {
@@ -637,25 +671,12 @@ impl Catalog {
             None => shown.last().map_or(order.len(), |last| last + 1),
         };
         order.insert(to, &moved);
-        let before: HashMap<&String, i64> = was
+        let before: HashMap<&str, i64> = was
             .iter()
-            .map(|(identity, at, _)| (identity, *at))
+            .map(|(identity, at, _)| (identity.as_str(), *at))
             .collect();
-        for (place, identity) in order.into_iter().enumerate() {
-            let place = place as i64;
-            // Most books stay where they were.
-            if before.get(identity) == Some(&place) {
-                continue;
-            }
-            sqlx::query(
-                "UPDATE reading_list_book SET position = ? WHERE list_id = ? AND content_hash = ?",
-            )
-            .bind(place)
-            .bind(id)
-            .bind(identity)
-            .execute(&mut *tx)
-            .await?;
-        }
+        let order = order.into_iter().map(String::as_str);
+        set_order(&mut tx, id, &before, order).await?;
         Ok(tx.commit().await?)
     }
 }

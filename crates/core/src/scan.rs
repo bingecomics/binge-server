@@ -23,6 +23,7 @@ use crate::archive::{self, Archive, ArchiveError, Contents};
 use crate::catalog::{Catalog, CatalogError, GroupKind, now};
 use crate::changes::{Arrival, Left};
 use crate::comicinfo::ComicInfo;
+use crate::from_files::{self, Waiting};
 use crate::import;
 use crate::layout;
 use crate::natural::natural_cmp;
@@ -392,6 +393,15 @@ impl Catalog {
         {
             tracing::warn!(library_id, %error, "could not record what the scan changed");
         }
+        // Lists and collections are there to read by: a scan goes on
+        // without them. What it could not put in them waits for the next.
+        let made = match self.made_from_files(library_id).await {
+            Ok(made) => self.fill_from_files(library_id, Waiting::Only, made).await,
+            Err(error) => Err(error.into()),
+        };
+        if let Err(error) = made {
+            tracing::warn!(library_id, %error, "could not make lists and collections from the files");
+        }
         self.analyze(library_id, &root, cancelled).await?;
 
         sqlx::query("UPDATE library SET last_scanned_at = ? WHERE id = ?")
@@ -498,6 +508,7 @@ impl Catalog {
             .await?;
         }
         people::credit(&mut tx, book_id, &info).await?;
+        from_files::note(&mut tx, book_id, &info).await?;
 
         if !same_pages {
             sqlx::query("DELETE FROM page WHERE book_id = ?")
@@ -757,6 +768,7 @@ pub(crate) mod tests {
     use crate::accounts::{self, UserId};
     use crate::db::Database;
     use crate::fixtures;
+    use crate::from_files::FromFiles;
 
     pub(crate) struct Shelf {
         _dir: tempfile::TempDir,
@@ -789,7 +801,7 @@ pub(crate) mod tests {
         pub(crate) async fn add(&self) -> i64 {
             let library = self
                 .catalog
-                .add_library(self.owner, &self.comics, None)
+                .add_library(self.owner, &self.comics, None, FromFiles::default())
                 .await
                 .unwrap();
             self.catalog.scan_finished(library.id).await;

@@ -45,6 +45,9 @@ pub struct Collection {
     /// The people it is shared with one by one, by name. Only the one whose
     /// collection it is is told: for anyone else there are none here.
     pub shared_with: Vec<UserName>,
+    /// Whether the files of a library made it, from a group of series they
+    /// name: see [`crate::from_files`].
+    pub from_files: bool,
 }
 
 /// SQL that holds when the user, `?1`, may see the collection whose id is
@@ -62,7 +65,7 @@ pub(crate) fn may_see(collection: &str) -> String {
 }
 
 /// Collections, as things that are made and shared.
-const COLLECTIONS: Kind = Kind {
+pub(crate) const COLLECTIONS: Kind = Kind {
     table: "collection",
     shares: "collection_share",
     of: "collection_id",
@@ -74,7 +77,8 @@ const COLLECTIONS: Kind = Kind {
 pub(crate) fn collections(rest: &str) -> String {
     format!(
         "SELECT c.id, c.name, c.summary, c.user_id, maker.name AS made_by, \
-         c.user_id = ?1 AS mine, c.shared_with_all \
+         c.user_id = ?1 AS mine, c.shared_with_all, \
+         c.from_files IS NOT NULL AS from_files \
          FROM collection c JOIN user maker ON maker.id = c.user_id WHERE {} {rest}",
         may_see("c.id")
     )
@@ -93,6 +97,7 @@ pub(crate) struct Row {
     made_by: String,
     mine: bool,
     shared_with_all: bool,
+    from_files: bool,
 }
 
 /// A series of a collection, with the collection it is in.
@@ -124,6 +129,7 @@ impl Collection {
             mine: row.mine,
             shared_with_all: row.shared_with_all,
             shared_with,
+            from_files: row.from_files,
         }
     }
 }
@@ -135,7 +141,7 @@ fn collection_name(name: &str) -> Result<&str, CatalogError> {
 
 /// Puts series in a collection and returns how many that added. A series
 /// the collection already holds is not counted.
-async fn put(
+pub(crate) async fn put(
     tx: &mut sqlx::SqliteConnection,
     collection_id: i64,
     series: &[i64],

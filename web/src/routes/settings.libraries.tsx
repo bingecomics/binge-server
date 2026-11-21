@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { useIsOwner } from "../api/account";
+import type { Library } from "../api/client";
 import { useLibraries } from "../api/libraries";
 import { AddLibraryDialog } from "../components/AddLibraryDialog";
 import { Button } from "../components/Button";
+import { FromFilesDialog, whatItMakes } from "../components/FromFiles";
 import { rowClass, rowSidesClass, Section } from "../components/Section";
 import { PathText, textLinkClass } from "../components/text";
 import { books } from "../format";
@@ -15,6 +17,11 @@ function LibrariesPage() {
   const libraries = useLibraries();
   const isOwner = useIsOwner();
   const [adding, setAdding] = useState(false);
+  // The library whose making from its files was last asked about, and
+  // whether it is being asked now. The dialog stays, so that closing it
+  // goes back to the row it was opened from.
+  const [asked, setAsked] = useState<Library>();
+  const [making, setMaking] = useState(false);
 
   return (
     <Section
@@ -42,11 +49,28 @@ function LibrariesPage() {
                 </span>
               </div>
               {library.path ? <PathText path={library.path} className="mt-1" /> : null}
+              {library.from_files ? (
+                <p className="mt-1 text-metadata">
+                  <button
+                    type="button"
+                    className={textLinkClass}
+                    onClick={() => {
+                      setAsked(library);
+                      setMaking(true);
+                    }}
+                  >
+                    {whatItMakes(library.from_files)}
+                  </button>
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
       {isOwner ? <AddLibraryDialog open={adding} onClose={() => setAdding(false)} /> : null}
+      {asked ? (
+        <FromFilesDialog open={making} library={asked} onClose={() => setMaking(false)} />
+      ) : null}
     </Section>
   );
 }

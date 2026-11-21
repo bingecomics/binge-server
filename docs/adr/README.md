@@ -29,6 +29,7 @@ it, so nobody has to guess later or reopen it by accident.
 | [0021](0021-a-reading-list-is-its-makers-to-share.md) | A reading list is its maker's, to share | Accepted |
 | [0022](0022-a-collection-holds-series-and-is-shared-as-a-list-is.md) | A collection holds series, and is shared as a list is | Accepted |
 | [0023](0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md) | Want to read is a person's own, and leaves out what was read | Accepted |
+| [0024](0024-a-library-makes-lists-and-collections-from-what-its-files-say.md) | A library makes lists and collections from what its files say | Accepted |
 
 ## Adding one
 

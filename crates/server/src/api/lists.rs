@@ -77,6 +77,10 @@ pub struct ReadingList {
     /// The people it is shared with one by one, in name order. Only the one
     /// whose list it is is told: it is empty for anyone else.
     pub shared_with: Vec<UserName>,
+    /// Whether the files of a library made it, from a story arc they name.
+    /// It is a list like any other: its owner changes and deletes it. The
+    /// files go on putting the books that name the arc in it.
+    pub from_files: bool,
 }
 
 impl From<binge_core::ReadingList> for ReadingList {
@@ -96,6 +100,7 @@ impl From<binge_core::ReadingList> for ReadingList {
             mine: list.mine,
             shared_with_all: list.shared_with_all,
             shared_with: list.shared_with.into_iter().map(UserName::from).collect(),
+            from_files: list.from_files,
         }
     }
 }

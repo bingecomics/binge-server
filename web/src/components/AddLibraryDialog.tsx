@@ -4,11 +4,13 @@ import { useAddLibrary } from "../api/libraries";
 import { Button } from "./Button";
 import { Dialog, DialogActions } from "./Dialog";
 import { fieldClass } from "./Field";
+import { FromFilesTicks, MAKES_BOTH } from "./FromFiles";
 import { ErrorText } from "./text";
 
 function AddLibraryForm({ onClose }: { onClose: () => void }) {
   const [path, setPath] = useState("");
   const [name, setName] = useState("");
+  const [fromFiles, setFromFiles] = useState(MAKES_BOTH);
   const pathId = useId();
   const nameId = useId();
   const errorId = useId();
@@ -18,7 +20,7 @@ function AddLibraryForm({ onClose }: { onClose: () => void }) {
   function submit(event: FormEvent) {
     event.preventDefault();
     add.mutate(
-      { path, name: name.trim() || null },
+      { path, name: name.trim() || null, from_files: fromFiles },
       {
         onSuccess: (library) => {
           onClose();
@@ -70,6 +72,10 @@ function AddLibraryForm({ onClose }: { onClose: () => void }) {
         placeholder="The folder's name"
         autoComplete="off"
       />
+
+      <div className="mt-5">
+        <FromFilesTicks from={fromFiles} onChange={setFromFiles} heading />
+      </div>
 
       {add.isError ? (
         <ErrorText id={errorId} className="mt-4">

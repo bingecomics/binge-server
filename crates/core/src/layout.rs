@@ -798,7 +798,12 @@ mod tests {
         // What cannot be done is refused, and nothing is made on the side.
         let elsewhere = tempfile::tempdir().unwrap();
         let other_library = catalog
-            .add_library(owner, elsewhere.path(), Some("Other"))
+            .add_library(
+                owner,
+                elsewhere.path(),
+                Some("Other"),
+                crate::FromFiles::default(),
+            )
             .await
             .unwrap();
         let far = catalog.create_series(owner, other_library.id, "Far Away");

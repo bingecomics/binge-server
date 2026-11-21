@@ -35,6 +35,7 @@ export type Letter = Schemas["Letter"];
 export type SearchResults = Schemas["SearchResults"];
 export type HeldTwice = Schemas["HeldTwice"];
 export type NewLibrary = Schemas["NewLibrary"];
+export type FromFiles = Schemas["FromFiles"];
 export type Health = Schemas["Health"];
 export type User = Schemas["User"];
 export type Credentials = Schemas["Credentials"];

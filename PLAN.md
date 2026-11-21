@@ -771,6 +771,20 @@ Built (2026-11-20): everything below
 - A series read to the end is left out, and is back by itself when it has
   a book that was not read.
 
+#### P1. Lists and collections from the files
+
+Built (2026-11-20): everything below
+([ADR 0024](docs/adr/0024-a-library-makes-lists-and-collections-from-what-its-files-say.md)).
+
+- A library makes a reading list of each story arc its files name, in the
+  order they give, and a collection of each group of series they name.
+- It does so when its owner asks: two choices of each library, asked when
+  it is added and changed from its menu and from Settings.
+- What it makes is the owner's, shared with everyone, and a list or a
+  collection like any other from then on.
+- A scan adds what the files it read name, and takes nothing out. No file
+  is changed.
+
 ### Later, in outline only
 
 These follow the web app steps and P1 above.

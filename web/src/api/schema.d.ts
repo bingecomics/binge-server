@@ -564,6 +564,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/libraries/{id}/from-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Says what a library makes from what its files say from now on. Only the
+         *     owner can.
+         * @description What is turned on is made at once, from what the last scan found the
+         *     files to say. What is turned off makes nothing more: the reading lists
+         *     and collections there are stay.
+         */
+        put: operations["makeFromFiles"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/libraries/{id}/scan": {
         parameters: {
             query?: never;
@@ -2291,6 +2314,13 @@ export interface components {
              *     different ones at most.
              */
             covers: string[];
+            /**
+             * @description Whether the files of a library made it, from a group of series they
+             *     name. It is a collection like any other: its owner changes and
+             *     deletes it. The files go on putting the series that name the group
+             *     in it.
+             */
+            from_files: boolean;
             /** Format: int64 */
             id: number;
             /** @description Whose collection it is: the person who made it. */
@@ -2417,6 +2447,25 @@ export interface components {
          * @enum {string}
          */
         Followed: "list" | "group" | "series";
+        /**
+         * @description What a library makes from what its files say. What it makes is the
+         *     owner's, shared with everyone, and from then on a reading list or a
+         *     collection like any other. A scan adds what the files it read name, and
+         *     takes nothing out. No file is changed.
+         */
+        FromFiles: {
+            /**
+             * @description A collection of each group of series the files name
+             *     (`SeriesGroup`).
+             */
+            collections: boolean;
+            /**
+             * @description A reading list of each story arc the files name (`StoryArc` with
+             *     `StoryArcNumber`, and `AlternateSeries` with `AlternateNumber`), its
+             *     books in the order those numbers give.
+             */
+            lists: boolean;
+        };
         /**
          * @description A part of a series: one of its volumes, a limited series told under its
          *     name, its annuals, its one-shots, its appearances in other titles, its
@@ -2563,6 +2612,7 @@ export interface components {
         Library: {
             /** Format: int64 */
             book_count: number;
+            from_files?: components["schemas"]["FromFiles"] | null;
             /** Format: int64 */
             id: number;
             /**
@@ -2704,6 +2754,7 @@ export interface components {
             number?: number | null;
         };
         NewLibrary: {
+            from_files?: components["schemas"]["FromFiles"] | null;
             /** @description Name to show. Defaults to the folder's name. */
             name?: string | null;
             /**
@@ -3068,6 +3119,12 @@ export interface components {
              * @description The earliest year its books came out.
              */
             first_year?: number | null;
+            /**
+             * @description Whether the files of a library made it, from a story arc they name.
+             *     It is a list like any other: its owner changes and deletes it. The
+             *     files go on putting the books that name the arc in it.
+             */
+            from_files: boolean;
             /** Format: int64 */
             id: number;
             /**
@@ -4826,6 +4883,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HeldTwice"][];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    makeFromFiles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The library */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FromFiles"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Library"];
                 };
             };
             /** @description The caller is not the owner */

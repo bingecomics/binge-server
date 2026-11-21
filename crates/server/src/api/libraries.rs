@@ -22,6 +22,7 @@ pub(super) fn routes() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(list, add))
         .routes(routes!(get, remove))
+        .routes(routes!(make_from_files))
         .routes(routes!(scan))
         .routes(routes!(series))
         .routes(routes!(letters))
@@ -47,7 +48,34 @@ pub struct Library {
     /// How many of the files that could not be read the owner set aside.
     /// Only the owner is told.
     pub set_aside_count: Option<i64>,
+    /// What it makes from what its files say. Only the owner is told.
+    pub from_files: Option<FromFiles>,
     pub scan: ScanStatus,
+}
+
+/// What a library makes from what its files say. What it makes is the
+/// owner's, shared with everyone, and from then on a reading list or a
+/// collection like any other. A scan adds what the files it read name, and
+/// takes nothing out. No file is changed.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct FromFiles {
+    /// A reading list of each story arc the files name (`StoryArc` with
+    /// `StoryArcNumber`, and `AlternateSeries` with `AlternateNumber`), its
+    /// books in the order those numbers give.
+    pub lists: bool,
+    /// A collection of each group of series the files name
+    /// (`SeriesGroup`).
+    pub collections: bool,
+}
+
+impl From<FromFiles> for binge_core::FromFiles {
+    fn from(from: FromFiles) -> Self {
+        Self {
+            lists: from.lists,
+            collections: from.collections,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -107,6 +135,11 @@ fn describe(catalog: &Catalog, user: &binge_core::User, library: binge_core::Lib
         // What is still to look at is the owner's to look at.
         unreadable_count: user.is_owner.then_some(library.unreadable_count),
         set_aside_count: user.is_owner.then_some(library.set_aside_count),
+        // What the server does with the files is the owner's to decide.
+        from_files: user.is_owner.then_some(FromFiles {
+            lists: library.lists_from_files,
+            collections: library.collections_from_files,
+        }),
     }
 }
 
@@ -117,6 +150,9 @@ pub struct NewLibrary {
     pub path: String,
     /// Name to show. Defaults to the folder's name.
     pub name: Option<String>,
+    /// What it makes from what its files say. Left out, it makes nothing
+    /// until it is asked to.
+    pub from_files: Option<FromFiles>,
 }
 
 /// Turns a leading `~` into the home folder, as a shell would.
@@ -174,7 +210,12 @@ async fn add(
     let path = expand_home(new.path.trim());
     let library = state
         .catalog
-        .add_library(owner.id, &path, new.name.as_deref())
+        .add_library(
+            owner.id,
+            &path,
+            new.name.as_deref(),
+            new.from_files.unwrap_or_default().into(),
+        )
         .await?;
     let library = describe(&state.catalog, &owner, library);
     Ok((StatusCode::CREATED, Json(library)))
@@ -219,6 +260,38 @@ async fn remove(
 ) -> Result<StatusCode, ApiError> {
     state.catalog.remove_library(id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Says what a library makes from what its files say from now on. Only the
+/// owner can.
+///
+/// What is turned on is made at once, from what the last scan found the
+/// files to say. What is turned off makes nothing more: the reading lists
+/// and collections there are stay.
+#[utoipa::path(
+    put,
+    path = "/libraries/{id}/from-files",
+    tag = "libraries",
+    operation_id = "makeFromFiles",
+    params(("id" = i64, Path, description = "The library")),
+    request_body = FromFiles,
+    responses(
+        (status = OK, body = Library),
+        (status = FORBIDDEN, description = "The caller is not the owner", body = ApiError),
+        (status = NOT_FOUND, body = ApiError),
+    )
+)]
+async fn make_from_files(
+    State(state): State<AppState>,
+    Owner(owner): Owner,
+    Path(id): Path<i64>,
+    Json(from): Json<FromFiles>,
+) -> Result<Json<Library>, ApiError> {
+    let library = state
+        .catalog
+        .make_from_files(owner.id, id, from.into())
+        .await?;
+    Ok(Json(describe(&state.catalog, &owner, library)))
 }
 
 /// Starts scanning a library for added, changed and removed files. Does
