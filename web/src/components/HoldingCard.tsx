@@ -25,6 +25,7 @@ export function HoldingCard({
   under,
   bookCount,
   unreadCount,
+  wanted,
   more,
 }: {
   what: Pickable;
@@ -37,6 +38,8 @@ export function HoldingCard({
   under?: string | null;
   bookCount: number;
   unreadCount: number;
+  /** For a series: whether it is on the reader's want to read. */
+  wanted?: boolean;
   /** What else its menu offers on the page it is shown on. */
   more?: ReactNode;
 }) {
@@ -58,6 +61,7 @@ export function HoldingCard({
             about={name}
             what={{ [what.kind]: [what.id] }}
             unreadCount={unreadCount}
+            wanted={wanted}
           >
             {more}
           </BooksMenu>

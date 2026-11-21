@@ -4,6 +4,7 @@ import { type BooksToMark, useMarkRead } from "../api/reading";
 import { AddToCollectionChoice } from "./AddToCollection";
 import { AddToListChoice } from "./AddToList";
 import { MenuItem, MoreMenu } from "./Menu";
+import { WantToReadChoice } from "./WantToRead";
 
 /** The two marks: what each does, and what it is called for one book and for all of several. */
 export const MARKS = [
@@ -42,25 +43,30 @@ export function ReadMarks({
 /**
  * The menu of something that holds books (a series, a group of one, a
  * reading list), in the `corner` of its card or on its page: it marks every
- * book of it, adds them all to a reading list, and adds whole series to a
- * collection. `children` are what else the menu of a page offers.
+ * book of it, adds them all to a reading list, and puts whole series on the
+ * reader's want to read and in a collection. `children` are what else the
+ * menu of a page offers.
  */
 export function BooksMenu({
   about,
   what,
   unreadCount,
+  wanted,
   corner = false,
   children,
 }: {
   about: string;
   what: BooksToMark;
   unreadCount: number;
+  /** Whether it is one series that is on the reader's want to read. */
+  wanted?: boolean;
   corner?: boolean;
   children?: ReactNode;
 }) {
   return (
     <MoreMenu about={about} corner={corner}>
       <ReadMarks all what={what} canRead={unreadCount > 0} />
+      <WantToReadChoice what={what} wanted={wanted} />
       <AddToListChoice what={what} />
       <AddToCollectionChoice what={what} />
       {children}

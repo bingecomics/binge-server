@@ -1,6 +1,6 @@
 //! Libraries, series and books: what the server knows about the comics.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -11,7 +11,7 @@ use crate::accounts::UserId;
 use crate::archive::ArchiveError;
 use crate::comicinfo::ComicInfo;
 use crate::db::Database;
-use crate::reading::Progress;
+use crate::reading::{MOST_NAMED, Progress, TOO_MANY_NAMED, list};
 use crate::scan::{Scan, analysis_workers};
 use crate::thumbnail::Thumbnails;
 
@@ -215,6 +215,9 @@ pub struct Series {
     pub cover: Option<String>,
     /// Whether the cover is one that was chosen for the series.
     pub cover_chosen: bool,
+    /// Whether the reader it is listed for put it on their want to read:
+    /// see [`Catalog::want_to_read`].
+    pub wanted: bool,
 }
 
 /// What a group of a series holds.
@@ -444,11 +447,55 @@ pub(crate) fn series(rest: &str) -> String {
           (SELECT {COVER} FROM {PLACED} {CHOSEN} LEFT JOIN series_group g ON g.id = bp.group_id \
            WHERE bp.series_id = s.id AND {COVER} IS NOT NULL \
            ORDER BY {} LIMIT 1)) AS cover, \
-         sc.cover IS NOT NULL AS cover_chosen \
+         sc.cover IS NOT NULL AS cover_chosen, \
+         EXISTS (SELECT 1 FROM want_to_read w \
+          WHERE w.user_id = ?1 AND w.series_id = s.id) AS wanted \
          FROM series s LEFT JOIN series_cover sc ON sc.series_id = s.id WHERE {} {rest}",
         reading_order(),
         may_read("s.library_id")
     )
+}
+
+/// What a request that names a series that is not there for the one who
+/// asks is answered with.
+const NOT_ON_SERVER: &str = "One of the series named is not on the server.";
+
+/// The series named, each once, when `user` may read every one of them.
+/// Refused when one is not there for them: what holds series by hand, a
+/// collection or want to read, is given exactly the series asked for. Asked
+/// inside the write that puts them in, so that none of them goes in between.
+pub(crate) async fn series_named(
+    tx: &mut sqlx::SqliteConnection,
+    user: UserId,
+    named: &[i64],
+) -> Result<Vec<i64>, CatalogError> {
+    if named.len() > MOST_NAMED {
+        return Err(CatalogError::Invalid(TOO_MANY_NAMED));
+    }
+    let mut seen = HashSet::new();
+    let asked: Vec<i64> = named
+        .iter()
+        .copied()
+        .filter(|id| seen.insert(*id))
+        .collect();
+    if asked.is_empty() {
+        return Ok(asked);
+    }
+    // The ids are part of the statement, so it is not one to keep.
+    let query = format!(
+        "SELECT COUNT(*) FROM series s WHERE s.id IN ({}) AND {}",
+        list(&asked),
+        may_read("s.library_id")
+    );
+    let there: i64 = sqlx::query_scalar(&query)
+        .persistent(false)
+        .bind(user)
+        .fetch_one(&mut *tx)
+        .await?;
+    if there as usize != asked.len() {
+        return Err(CatalogError::Invalid(NOT_ON_SERVER));
+    }
+    Ok(asked)
 }
 
 /// Selects the groups of the series a user may read, the ones that hold no

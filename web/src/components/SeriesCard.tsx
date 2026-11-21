@@ -28,6 +28,7 @@ export const SeriesCard = memo(function SeriesCard({
       name={series.name}
       bookCount={series.book_count}
       unreadCount={series.unread_count}
+      wanted={series.wanted}
       more={more}
     />
   );

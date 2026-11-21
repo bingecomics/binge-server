@@ -21,6 +21,7 @@ mod settings;
 mod updates;
 mod users;
 mod views;
+mod wanted;
 
 use axum::body::Bytes;
 use axum::http::header;
@@ -110,6 +111,7 @@ fn guarded() -> OpenApiRouter<AppState> {
         .merge(collections::routes())
         .merge(people::routes())
         .merge(views::routes())
+        .merge(wanted::routes())
         .merge(settings::routes())
         .merge(history::routes())
         .merge(kept::routes())

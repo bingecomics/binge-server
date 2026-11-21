@@ -30,6 +30,7 @@ mod settings;
 pub mod sharing;
 mod thumbnail;
 pub mod views;
+pub mod wanted;
 
 #[cfg(any(test, feature = "fixtures"))]
 pub mod fixtures;

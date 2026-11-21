@@ -101,6 +101,15 @@ export function useRecentlyUpdated() {
 export type BooksToMark = Omit<ReadMark, "read">;
 
 /**
+ * The series named, when series are all that is named. A collection and
+ * want to read hold whole series, so nothing else goes on them.
+ */
+export function onlySeries(what: BooksToMark): number[] | null {
+  const named = what.books?.length || what.groups?.length || what.lists?.length;
+  return what.series?.length && !named ? what.series : null;
+}
+
+/**
  * Marks books as read, or as unread. Every list that shows them is asked for
  * again, and what goes wrong is said over the page: a menu that asked for
  * the mark is closed by then. `onMarked` runs once the server has it.

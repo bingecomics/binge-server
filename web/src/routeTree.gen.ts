@@ -14,6 +14,7 @@ import { Route as HistoryRouteImport } from './routes/history'
 import { Route as KeptRouteImport } from './routes/kept'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as WantToReadRouteImport } from './routes/want-to-read'
 import { Route as BooksBookIdRouteImport } from './routes/books.$bookId'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
 import { Route as CollectionsCollectionIdRouteImport } from './routes/collections.$collectionId'
@@ -58,6 +59,11 @@ const SearchRoute = SearchRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WantToReadRoute = WantToReadRouteImport.update({
+  id: '/want-to-read',
+  path: '/want-to-read',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BooksBookIdRoute = BooksBookIdRouteImport.update({
@@ -169,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/kept': typeof KeptRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/want-to-read': typeof WantToReadRoute
   '/books/$bookId': typeof BooksBookIdRoute
   '/collections/$collectionId': typeof CollectionsCollectionIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/kept': typeof KeptRoute
   '/search': typeof SearchRoute
+  '/want-to-read': typeof WantToReadRoute
   '/books/$bookId': typeof BooksBookIdRoute
   '/collections/$collectionId': typeof CollectionsCollectionIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
@@ -223,6 +231,7 @@ export interface FileRoutesById {
   '/kept': typeof KeptRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/want-to-read': typeof WantToReadRoute
   '/books/$bookId': typeof BooksBookIdRoute
   '/collections/$collectionId': typeof CollectionsCollectionIdRoute
   '/libraries/$libraryId': typeof LibrariesLibraryIdRoute
@@ -252,6 +261,7 @@ export interface FileRouteTypes {
     | '/kept'
     | '/search'
     | '/settings'
+    | '/want-to-read'
     | '/books/$bookId'
     | '/collections/$collectionId'
     | '/libraries/$libraryId'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/kept'
     | '/search'
+    | '/want-to-read'
     | '/books/$bookId'
     | '/collections/$collectionId'
     | '/libraries/$libraryId'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/kept'
     | '/search'
     | '/settings'
+    | '/want-to-read'
     | '/books/$bookId'
     | '/collections/$collectionId'
     | '/libraries/$libraryId'
@@ -333,6 +345,7 @@ export interface RootRouteChildren {
   KeptRoute: typeof KeptRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  WantToReadRoute: typeof WantToReadRoute
   BooksBookIdRoute: typeof BooksBookIdRoute
   CollectionsCollectionIdRoute: typeof CollectionsCollectionIdRoute
   LibrariesLibraryIdRoute: typeof LibrariesLibraryIdRoute
@@ -383,6 +396,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/want-to-read': {
+      id: '/want-to-read'
+      path: '/want-to-read'
+      fullPath: '/want-to-read'
+      preLoaderRoute: typeof WantToReadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/books/$bookId': {
@@ -558,6 +578,7 @@ const rootRouteChildren: RootRouteChildren = {
   KeptRoute: KeptRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  WantToReadRoute: WantToReadRoute,
   BooksBookIdRoute: BooksBookIdRoute,
   CollectionsCollectionIdRoute: CollectionsCollectionIdRoute,
   LibrariesLibraryIdRoute: LibrariesLibraryIdRoute,

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpDown, Bookmark, Plus } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 import { useIsOwner } from "../api/account";
-import type { Book, Library, ReadingList, View } from "../api/client";
+import type { Book, Library, ReadingList, Series, View } from "../api/client";
 import { useLibraries } from "../api/libraries";
 import { useReadingLists } from "../api/lists";
 import {
@@ -13,6 +13,7 @@ import {
 } from "../api/reading";
 import { useSettings } from "../api/settings";
 import { linkTo, SERIES_IN_A_ROW, useViewSeries, useViews } from "../api/views";
+import { useWantToRead } from "../api/wanted";
 import { AddLibraryDialog } from "../components/AddLibraryDialog";
 import { ArrangeHomeDialog } from "../components/ArrangeHomeDialog";
 import { BookCard } from "../components/BookCard";
@@ -51,6 +52,15 @@ function LibraryCard({ library }: { library: Library }) {
 
 function bookCard(book: Book) {
   return <BookCard key={book.id} book={book} />;
+}
+
+function seriesCard(series: Series) {
+  return <SeriesCard key={series.id} series={series} titleAs="h3" />;
+}
+
+/** The way from a row of series to all of them, which says how many when the row shows fewer. */
+function allOf(total: number): string {
+  return total > SERIES_IN_A_ROW ? `All ${total.toLocaleString()}` : "See all";
 }
 
 /**
@@ -136,16 +146,15 @@ function standing(list: ReadingList): number {
 /** A view as a row: the first of its series, and the way to all of them. */
 function ViewRow({ view }: { view: View }) {
   const series = useViewSeries(view);
-  const total = series.data?.total ?? 0;
   return (
     <Row
       title={view.name}
       items={series.data?.series}
       problem={series.error}
-      card={(one) => <SeriesCard key={one.id} series={one} titleAs="h3" />}
+      card={seriesCard}
       action={
         <Link {...linkTo(view)} className={textLinkClass}>
-          {total > SERIES_IN_A_ROW ? `All ${total.toLocaleString()}` : "See all"}
+          {allOf(series.data?.total ?? 0)}
         </Link>
       }
     />
@@ -172,6 +181,23 @@ function UpNext({ title }: { title: string }) {
   );
 }
 
+function WantToRead({ title }: { title: string }) {
+  const wanted = useWantToRead(1, SERIES_IN_A_ROW);
+  return (
+    <Row
+      title={title}
+      items={wanted.data?.series}
+      problem={wanted.error}
+      card={seriesCard}
+      action={
+        <Link to="/want-to-read" className={textLinkClass}>
+          {allOf(wanted.data?.total ?? 0)}
+        </Link>
+      }
+    />
+  );
+}
+
 function ReadingLists({ title }: { title: string }) {
   const lists = useReadingLists();
   return (
@@ -193,14 +219,7 @@ function ReadingLists({ title }: { title: string }) {
 
 function RecentlyUpdated({ title }: { title: string }) {
   const updated = useRecentlyUpdated();
-  return (
-    <Row
-      title={title}
-      items={updated.data}
-      problem={updated.error}
-      card={(series) => <SeriesCard key={series.id} series={series} titleAs="h3" />}
-    />
-  );
+  return <Row title={title} items={updated.data} problem={updated.error} card={seriesCard} />;
 }
 
 function RecentlyAdded({ title }: { title: string }) {
@@ -220,11 +239,13 @@ function Home() {
   const [arranging, setArranging] = useState(false);
 
   const onHome = views.data?.filter((view) => view.on_home) ?? [];
-  // Every row there is, in the order they come in until arranged: the
-  // views that are rows, by name, come after the reading lists.
+  // Every row there is, in the order they come in until arranged: what
+  // the reader wants to read comes before the reading lists, and the views
+  // that are rows, by name, after them.
   const rows = [
     own("continue", "Continue reading", ContinueReading),
     own("up-next", "Up next", UpNext),
+    own("want-to-read", "Want to read", WantToRead),
     own("lists", "Reading lists", ReadingLists),
     ...onHome.map((view) => ({
       id: viewRow(view.id),

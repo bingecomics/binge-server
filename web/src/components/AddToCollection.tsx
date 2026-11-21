@@ -1,6 +1,6 @@
 import { Layers } from "lucide-react";
 import { useAddToCollection, useCollections, useCreateCollection } from "../api/collections";
-import type { BooksToMark } from "../api/reading";
+import { type BooksToMark, onlySeries } from "../api/reading";
 import { seriesCount } from "../format";
 import { tell } from "../problems";
 import { store } from "../store";
@@ -27,8 +27,8 @@ export function askToAddToCollection(series: number[], onAdded?: () => void) {
  * else has no such choice.
  */
 export function AddToCollectionChoice({ what }: { what: BooksToMark }) {
-  const series = what.series;
-  if (!series?.length || what.books?.length || what.groups?.length || what.lists?.length) {
+  const series = onlySeries(what);
+  if (!series) {
     return null;
   }
   return (

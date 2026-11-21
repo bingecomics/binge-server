@@ -9,18 +9,14 @@
 //! series they may read, and one that was shared with them and would show
 //! them none is not there for them.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::accounts::{UserId, UserName};
-use crate::catalog::{Catalog, CatalogError, Series, may_read, now, series};
+use crate::catalog::{Catalog, CatalogError, Series, may_read, now, series, series_named};
 use crate::import;
 use crate::layout::a_name;
-use crate::reading::{MOST_NAMED, TOO_MANY_NAMED, list};
+use crate::reading::list;
 use crate::sharing::{Kind, Sharing, a_summary, first_covers};
-
-/// What a request that names a series the collection cannot take is
-/// answered with.
-const NOT_ON_SERVER: &str = "One of the series named is not on the server.";
 
 /// A collection, as one user sees it.
 #[derive(Clone, Debug)]
@@ -135,44 +131,6 @@ impl Collection {
 /// A collection's name as it is kept.
 fn collection_name(name: &str) -> Result<&str, CatalogError> {
     a_name(name, "A collection needs a name.")
-}
-
-/// The series named, each once, when `user` may read every one of them.
-/// Refused when one is not there for them: a collection is given exactly
-/// the series asked for. Asked inside the write that puts them in, so that
-/// none of them goes in between.
-async fn series_named(
-    tx: &mut sqlx::SqliteConnection,
-    user: UserId,
-    named: &[i64],
-) -> Result<Vec<i64>, CatalogError> {
-    if named.len() > MOST_NAMED {
-        return Err(CatalogError::Invalid(TOO_MANY_NAMED));
-    }
-    let mut seen = HashSet::new();
-    let asked: Vec<i64> = named
-        .iter()
-        .copied()
-        .filter(|id| seen.insert(*id))
-        .collect();
-    if asked.is_empty() {
-        return Ok(asked);
-    }
-    // The ids are part of the statement, so it is not one to keep.
-    let query = format!(
-        "SELECT COUNT(*) FROM series s WHERE s.id IN ({}) AND {}",
-        list(&asked),
-        may_read("s.library_id")
-    );
-    let there: i64 = sqlx::query_scalar(&query)
-        .persistent(false)
-        .bind(user)
-        .fetch_one(&mut *tx)
-        .await?;
-    if there as usize != asked.len() {
-        return Err(CatalogError::Invalid(NOT_ON_SERVER));
-    }
-    Ok(asked)
 }
 
 /// Puts series in a collection and returns how many that added. A series

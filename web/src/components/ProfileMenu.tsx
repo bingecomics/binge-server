@@ -9,10 +9,12 @@ import {
 } from "lucide-react";
 import { useMe, useSignOut } from "../api/account";
 import { Menu, MenuItem, MenuLink } from "./Menu";
+import { WantToReadIcon } from "./WantToRead";
 
 /**
  * Who is signed in, at the end of the bar at the top. It opens what is the
- * person's own: their collections, the pages they kept, what they read,
+ * person's own: what they want to read, their collections, the pages they
+ * kept, what they read,
  * their account, their tokens, and the way out.
  */
 export function ProfileMenu() {
@@ -45,6 +47,9 @@ export function ProfileMenu() {
         <p className="text-caption text-fg-muted">{me.role === "owner" ? "Owner" : "Member"}</p>
       </div>
       <div className="border-divider border-t pt-2">
+        <MenuLink to="/want-to-read" icon={WantToReadIcon}>
+          Want to read
+        </MenuLink>
         <MenuLink to="/collections" icon={Layers}>
           Collections
         </MenuLink>

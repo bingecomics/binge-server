@@ -4000,3 +4000,72 @@ async fn pages_are_kept_and_sent_small() {
     let read = overview["read"].as_object().unwrap();
     assert_eq!(read["seconds_left"], json!(null));
 }
+
+#[tokio::test]
+async fn want_to_read_is_each_persons_own() {
+    let server = server().await;
+    fixtures::write_book(&server.comics.join("Saga/Saga 001.cbz"), 2, 1);
+    fixtures::write_book(&server.comics.join("Paper Girls/Paper Girls 001.cbz"), 2, 2);
+    let comics = server.add_library().await;
+    let manga = server.add_second_library("Manga").await;
+    server.add_user("Cleo", &[manga]).await;
+    let cleo = server.signed_in_as("Cleo", PASSWORD).await;
+    let [paper, saga] = server.series_ids(comics).await[..] else {
+        panic!("two series");
+    };
+    let wanted = "/api/v1/want-to-read";
+    let of_saga = format!("/api/v1/series/{saga}");
+    let off_saga = format!("{wanted}/{saga}");
+
+    // A series named twice is put there once, and one already there stays.
+    let none = json!({ "series": [], "total": 0 });
+    assert_eq!(server.get(wanted).await.json(), none);
+    let put = server
+        .post(wanted, json!({ "series": [saga, saga, paper] }))
+        .await;
+    assert_eq!(put.status, StatusCode::OK);
+    assert_eq!(put.json(), json!({ "series": 2 }));
+    let again = server.post(wanted, json!({ "series": [saga] })).await;
+    assert_eq!(again.json(), json!({ "series": 0 }));
+    let theirs = server.get(wanted).await.json();
+    assert_eq!(theirs["total"], 2);
+    assert_eq!(theirs["series"][0]["name"], "Paper Girls");
+    assert_eq!(theirs["series"][1]["name"], "Saga");
+    assert_eq!(theirs["series"][1]["wanted"], true);
+    // A part of it says how many there are in all.
+    let part = server
+        .get(&format!("{wanted}?offset=1&limit=1"))
+        .await
+        .json();
+    assert_eq!(part["series"][0]["name"], "Saga");
+    assert_eq!(part["total"], 2);
+    assert_eq!(server.get(&of_saga).await.json()["wanted"], true);
+
+    // Nobody else is shown it, and a series a person may not read is not
+    // put on theirs: nothing of the request is.
+    assert_eq!(cleo.get(wanted).await.json(), none);
+    let manga_series = server.series_ids(manga).await[0];
+    let refused = cleo
+        .post(wanted, json!({ "series": [manga_series, saga] }))
+        .await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refused.json()["code"], "invalid_request");
+    assert_eq!(cleo.get(wanted).await.json(), none);
+    assert_eq!(cleo.delete(&off_saga).await.status, StatusCode::NOT_FOUND);
+
+    // A series read to the end is left out, and is still theirs to take
+    // off.
+    let whole = json!({ "read": true, "series": [saga] });
+    let marked = server.post("/api/v1/read-marks", whole).await;
+    assert_eq!(marked.status, StatusCode::OK);
+    let theirs = server.get(wanted).await.json();
+    assert_eq!(theirs["total"], 1);
+    assert_eq!(theirs["series"][0]["name"], "Paper Girls");
+    assert_eq!(server.get(&of_saga).await.json()["wanted"], true);
+    assert_eq!(
+        server.delete(&off_saga).await.status,
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(server.get(&of_saga).await.json()["wanted"], false);
+    assert_eq!(server.delete(&off_saga).await.status, StatusCode::NOT_FOUND);
+}

@@ -118,11 +118,10 @@ pub struct SeriesNamed {
     pub series: Vec<i64>,
 }
 
-/// What adding series to a collection changed.
+/// What adding series to a collection, or to want to read, changed.
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SeriesAdded {
-    /// How many series the collection gained. The ones it already held are
-    /// not counted.
+    /// How many series it gained. The ones it already held are not counted.
     pub series: u64,
 }
 

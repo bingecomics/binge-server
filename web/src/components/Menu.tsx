@@ -18,10 +18,10 @@ import { iconButtonClass } from "./NavLink";
 const EDGE = 8;
 /** Room between a menu and its button, in pixels. */
 const GAP = 4;
-/** How wide a menu is, in pixels. */
-const WIDTH = 240;
-/** Room enough under a button for most menus, four choices tall, in pixels. */
-const ROOM = 200;
+/** How wide a menu is, in pixels: its longest choices fit on one line. */
+const WIDTH = 256;
+/** Room enough under a button for most menus, five choices tall, in pixels. */
+const ROOM = 240;
 
 /**
  * Where a menu goes: under its button and starting where the button starts.

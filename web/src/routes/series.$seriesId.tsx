@@ -265,6 +265,7 @@ function SeriesPage() {
             about={series.name}
             what={{ series: [series.id] }}
             unreadCount={series.unread_count}
+            wanted={series.wanted}
           >
             <CoverChoices of={{ kind: "series", id: series.id }} chosen={series.cover_chosen} />
           </BooksMenu>

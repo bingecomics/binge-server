@@ -1900,6 +1900,52 @@ export interface paths {
         patch: operations["changeView"];
         trace?: never;
     };
+    "/api/v1/want-to-read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lists a part of the series the caller wants to read, the ones put there
+         *     last first.
+         * @description A series they have read to the end is left out. It is still theirs to
+         *     take off, and it is listed again by itself once it has a book they have
+         *     not read.
+         */
+        get: operations["listWantToRead"];
+        put?: never;
+        /**
+         * Puts the series named on the caller's want to read. A series already on
+         *     it stays where it was.
+         * @description Every series named must be on the server: one that is not refuses the
+         *     request, and nothing is added. One request names 10,000 at most.
+         */
+        post: operations["addToWantToRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/want-to-read/{series_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Takes a series off the caller's want to read. */
+        delete: operations["takeOffWantToRead"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3282,13 +3328,17 @@ export interface components {
              * @description How many of its books the caller has not read to the end.
              */
             unread_count: number;
+            /**
+             * @description Whether the caller put it on their want to read. It stays so until
+             *     they take it off, also once they have read all of it.
+             */
+            wanted: boolean;
         };
-        /** @description What adding series to a collection changed. */
+        /** @description What adding series to a collection, or to want to read, changed. */
         SeriesAdded: {
             /**
              * Format: int64
-             * @description How many series the collection gained. The ones it already held are
-             *     not counted.
+             * @description How many series it gained. The ones it already held are not counted.
              */
             series: number;
         };
@@ -7969,6 +8019,92 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    listWantToRead: {
+        parameters: {
+            query?: {
+                /** @description How many to pass over, from the start of the list. */
+                offset?: number;
+                /** @description How many to answer with: 100 when left out, 500 at most. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PagedSeries"];
+                };
+            };
+        };
+    };
+    addToWantToRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesNamed"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesAdded"];
+                };
+            };
+            /** @description A series named is not on the server */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    takeOffWantToRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The series */
+                series_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The series is off it */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such series, or it is not on the caller's want to read */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -94,6 +94,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `covers.rs` | The covers people chose for a book, a series or a reading list |
 | `lists.rs` | Reading lists: books of any series in a chosen order |
 | `collections.rs` | Collections: series picked by hand, from any library |
+| `wanted.rs` | Want to read: the series each person means to read |
 | `sharing.rs` | What reading lists and collections share: whose a thing is, and who it is shared with |
 | `cbl.rs` | Reads a CBL file and finds the book each of its entries means |
 | `natural.rs` | Name order where "Issue 2" comes before "Issue 10", and a name with an accent sits with its letter |
@@ -177,6 +178,8 @@ The routes today:
 | `GET /pages/{identity}/{number}` | A page image, as the file stores it |
 | `GET /continue-reading`, `GET /up-next` | Books started and not finished; the book that follows a finished one |
 | `DELETE /up-next/{series_id}` | Take a series off the caller's `/up-next` until they read from it again |
+| `GET /want-to-read?offset=&limit=`, `POST /want-to-read` | A part of the series the caller wants to read and has not read to the end, the last put there first, with how many there are; put series on it |
+| `DELETE /want-to-read/{series_id}` | Take a series off the caller's want to read |
 | `GET /recently-updated`, `GET /recently-added` | The series that got a book last; the newest books |
 | `GET /me/reading?year=` | What the caller read in a year: the days they read on, each month, the writers they read most, and the first year there is anything of |
 | `GET /reading-now` | For the owner: who has turned a page in the last half hour, and of which book |
@@ -289,15 +292,15 @@ from anywhere. On every page but the settings', a window at least 1024 px
 wide also has a slider there for the size of the covers: one size for every grid
 and row, from 6 to 13 rem, kept by the server for each person
 (`cover-size`, see "What a person chose" below). The menu lists
-Home, the reading lists, the collections, the kept pages, the views kept
-for the menu and the libraries. On a settings page it is the settings' own menu
+Home, what the person wants to read, the reading lists, the collections,
+the kept pages, the views kept for the menu and the libraries. On a settings page it is the settings' own menu
 instead, a page for each part: `/settings/account`,
 `/settings/tokens`, and for the owner `/settings/users`,
 `/settings/libraries`, `/settings/views` and `/settings/server`. A narrow
 window has no room beside the page: there the settings' menu is a row
 above it, the reading lists, the views of the menu and the libraries
-are reached from Home, and the collections from the menu of who is signed
-in.
+are reached from Home, and want to read and the collections from the menu
+of who is signed in.
 
 **Menus and picking several.** Every card of a book, a group, a series or
 a reading list has a menu in the corner of its cover, and so has the page of each, of a
@@ -847,6 +850,29 @@ dialogs that name and share a collection are the ones a reading list
 uses. A series' page says which collections it is in and which reading
 lists hold a book of it.
 
+### Want to read
+
+Each person has one list of the series they mean to read, and nobody
+else is shown it
+([ADR 0023](adr/0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md)).
+
+- **What it holds.** `want_to_read` has a row for a person and the record
+  of a series, with when it was put there. The row stays until the person
+  takes the series off, the series is deleted, or its library is removed.
+  Every `Series` an answer holds says in `wanted` whether the caller has
+  such a row.
+- **What is shown.** `GET /want-to-read` answers with a part of the
+  series on it that have a book the caller has not read, the last put
+  there first, and with how many there are in all.
+  Nothing is written when a book is read: a series read to the end is
+  left out when the list is asked for, and is on it again by itself once
+  it has a book that is not read.
+
+**In the web app.** `/want-to-read` shows them as the cards every page
+uses, 120 to a page, and Home has the first 24 as a row. The menu of a series offers "Add to
+want to read", or "Remove from want to read" once it is on it, and the
+bar of what is picked puts several there while only series are picked.
+
 ## Reading and progress
 
 **Pages.** `GET /books/{id}/pages` lists a book's pages with the width and
@@ -964,8 +990,9 @@ server works this out, as it does the "next" of a series, so every client
 shows the same row.
 
 Home shows the four lists in that order, each as one line of covers that
-goes on sideways, with the reading lists and the views that are rows after
-"Up next", and the libraries under them all. Each person arranges it: the
+goes on sideways, with what the person wants to read, the reading lists
+and the views that are rows after "Up next", and the libraries under them
+all. Each person arranges it: the
 order of the rows and which are put away, kept by the server (`home.rows`).
 A row with nothing in it is not shown, and the libraries always end the
 page.
@@ -1051,8 +1078,8 @@ a value is 8 KB of text at most, and a person keeps 100 at most. The web
 app keeps four: `cover-size`, the size of the covers in rem; `reader` and
 `reader.series`, how the reader shows books, as JSON; and
 `home.rows`, the arrangement of Home as JSON with the `order` of its rows
-and the ones `hidden`. A row is named `continue`, `up-next`, `lists`,
-`updated`, `added` or `view:` and a view's id. A row the arrangement does
+and the ones `hidden`. A row is named `continue`, `up-next`,
+`want-to-read`, `lists`, `updated`, `added` or `view:` and a view's id. A row the arrangement does
 not name, as a view made since, comes after the row it would follow by
 itself.
 
@@ -1250,3 +1277,4 @@ Listed here so the parts above make sense. Details are in
 | [0020](adr/0020-the-server-updates-itself-from-signed-releases.md) | The server updates itself from signed releases |
 | [0021](adr/0021-a-reading-list-is-its-makers-to-share.md) | A reading list is its maker's, to share |
 | [0022](adr/0022-a-collection-holds-series-and-is-shared-as-a-list-is.md) | A collection holds series, and is shared as a list is |
+| [0023](adr/0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md) | Want to read is a person's own, and leaves out what was read |

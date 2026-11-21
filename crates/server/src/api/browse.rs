@@ -46,6 +46,9 @@ pub struct Series {
     pub cover: Option<String>,
     /// Whether the cover is one that was chosen for the series.
     pub cover_chosen: bool,
+    /// Whether the caller put it on their want to read. It stays so until
+    /// they take it off, also once they have read all of it.
+    pub wanted: bool,
 }
 
 /// What a group of a series holds.
@@ -139,6 +142,7 @@ impl From<binge_core::Series> for Series {
             unread_count: series.unread_count,
             cover: series.cover,
             cover_chosen: series.cover_chosen,
+            wanted: series.wanted,
         }
     }
 }

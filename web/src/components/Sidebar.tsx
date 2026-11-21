@@ -9,6 +9,7 @@ import { AddLibraryDialog } from "./AddLibraryDialog";
 import { ComicLibraryIcon } from "./ComicLibraryIcon";
 import { iconButtonClass, NavLink, navHeadingClass, navLinkClass, sideMenuClass } from "./NavLink";
 import { ServerStatus } from "./ServerStatus";
+import { WantToReadIcon } from "./WantToRead";
 
 function Libraries() {
   const libraries = useLibraries();
@@ -110,20 +111,21 @@ function Views() {
 }
 
 /**
- * What there is to read, in a column beside the page: Home, the reading
- * lists, the collections, the kept pages, the views kept for the menu and
- * the libraries.
+ * What there is to read, in a column beside the page: Home, what the
+ * reader wants to read, the reading lists, the collections, the kept pages,
+ * the views kept for the menu and the libraries.
  * What was read is not here: it is looked at now and then, and the menu of
  * who is signed in leads to it. A narrow window has no room for the column:
  * there the name in the bar at the top leads Home, which shows the reading
  * lists and lists the libraries and those views, and the menu of who is
- * signed in leads to the collections and the kept pages too.
+ * signed in leads to want to read, the collections and the kept pages too.
  */
 export function Sidebar() {
   return (
     <aside className={`${sideMenuClass} hidden md:flex md:flex-col md:gap-6 md:px-3 md:py-6`}>
       <nav aria-label="Main" className="flex flex-col gap-1">
         <NavLink to="/" icon={House} label="Home" />
+        <NavLink to="/want-to-read" icon={WantToReadIcon} label="Want to read" />
         <NavLink to="/lists" icon={ListOrdered} label="Reading lists" withPagesUnder />
         <NavLink to="/collections" icon={Layers} label="Collections" withPagesUnder />
         <NavLink to="/kept" icon={BookMarked} label="Kept pages" />

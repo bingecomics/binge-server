@@ -6248,6 +6248,126 @@
           }
         }
       }
+    },
+    "/api/v1/want-to-read": {
+      "get": {
+        "tags": [
+          "reading"
+        ],
+        "summary": "Lists a part of the series the caller wants to read, the ones put there\nlast first.",
+        "description": "A series they have read to the end is left out. It is still theirs to\ntake off, and it is listed again by itself once it has a book they have\nnot read.",
+        "operationId": "listWantToRead",
+        "parameters": [
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "How many to pass over, from the start of the list.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many to answer with: 100 when left out, 500 at most.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedSeries"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "reading"
+        ],
+        "summary": "Puts the series named on the caller's want to read. A series already on\nit stays where it was.",
+        "description": "Every series named must be on the server: one that is not refuses the\nrequest, and nothing is added. One request names 10,000 at most.",
+        "operationId": "addToWantToRead",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeriesNamed"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesAdded"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A series named is not on the server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/want-to-read/{series_id}": {
+      "delete": {
+        "tags": [
+          "reading"
+        ],
+        "summary": "Takes a series off the caller's want to read.",
+        "operationId": "takeOffWantToRead",
+        "parameters": [
+          {
+            "name": "series_id",
+            "in": "path",
+            "description": "The series",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The series is off it"
+          },
+          "404": {
+            "description": "No such series, or it is not on the caller's want to read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8961,7 +9081,8 @@
           "name",
           "book_count",
           "unread_count",
-          "cover_chosen"
+          "cover_chosen",
+          "wanted"
         ],
         "properties": {
           "book_count": {
@@ -8994,12 +9115,16 @@
             "type": "integer",
             "format": "int64",
             "description": "How many of its books the caller has not read to the end."
+          },
+          "wanted": {
+            "type": "boolean",
+            "description": "Whether the caller put it on their want to read. It stays so until\nthey take it off, also once they have read all of it."
           }
         }
       },
       "SeriesAdded": {
         "type": "object",
-        "description": "What adding series to a collection changed.",
+        "description": "What adding series to a collection, or to want to read, changed.",
         "required": [
           "series"
         ],
@@ -9007,7 +9132,7 @@
           "series": {
             "type": "integer",
             "format": "int64",
-            "description": "How many series the collection gained. The ones it already held are\nnot counted.",
+            "description": "How many series it gained. The ones it already held are not counted.",
             "minimum": 0
           }
         }

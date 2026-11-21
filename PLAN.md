@@ -758,6 +758,19 @@ Built (2026-11-20): everything below
 - Search finds a collection by its name. A series' page says which
   collections it is in and which reading lists hold a book of it.
 
+#### P1. Want to read
+
+Built (2026-11-20): everything below
+([ADR 0023](docs/adr/0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md)).
+
+- Each person has one list of the series they want to read. It is theirs
+  alone and is not shared.
+- A series is put there from its menu, and several at once from the bar of
+  what is picked. It is taken off from the same menu.
+- It is a row of Home and a page of its own, the last put there first.
+- A series read to the end is left out, and is back by itself when it has
+  a book that was not read.
+
 ### Later, in outline only
 
 These follow the web app steps and P1 above.
