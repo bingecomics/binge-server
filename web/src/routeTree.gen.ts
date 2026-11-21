@@ -27,6 +27,7 @@ import { Route as ReadBookIdRouteImport } from './routes/read.$bookId'
 import { Route as SeriesSeriesIdRouteImport } from './routes/series.$seriesId'
 import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SettingsAccountRouteImport } from './routes/settings.account'
+import { Route as SettingsBringRouteImport } from './routes/settings.bring'
 import { Route as SettingsLibrariesRouteImport } from './routes/settings.libraries'
 import { Route as SettingsServerRouteImport } from './routes/settings.server'
 import { Route as SettingsTokensRouteImport } from './routes/settings.tokens'
@@ -125,6 +126,11 @@ const SettingsAccountRoute = SettingsAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsBringRoute = SettingsBringRouteImport.update({
+  id: '/bring',
+  path: '/bring',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsLibrariesRoute = SettingsLibrariesRouteImport.update({
   id: '/libraries',
   path: '/libraries',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/read/$bookId': typeof ReadBookIdRoute
   '/series/$seriesId': typeof SeriesSeriesIdRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/bring': typeof SettingsBringRoute
   '/settings/libraries': typeof SettingsLibrariesRoute
   '/settings/server': typeof SettingsServerRoute
   '/settings/tokens': typeof SettingsTokensRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/read/$bookId': typeof ReadBookIdRoute
   '/series/$seriesId': typeof SeriesSeriesIdRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/bring': typeof SettingsBringRoute
   '/settings/libraries': typeof SettingsLibrariesRoute
   '/settings/server': typeof SettingsServerRoute
   '/settings/tokens': typeof SettingsTokensRoute
@@ -233,6 +241,7 @@ export interface FileRoutesById {
   '/read/$bookId': typeof ReadBookIdRoute
   '/series/$seriesId': typeof SeriesSeriesIdRoute
   '/settings/account': typeof SettingsAccountRoute
+  '/settings/bring': typeof SettingsBringRoute
   '/settings/libraries': typeof SettingsLibrariesRoute
   '/settings/server': typeof SettingsServerRoute
   '/settings/tokens': typeof SettingsTokensRoute
@@ -262,6 +271,7 @@ export interface FileRouteTypes {
     | '/read/$bookId'
     | '/series/$seriesId'
     | '/settings/account'
+    | '/settings/bring'
     | '/settings/libraries'
     | '/settings/server'
     | '/settings/tokens'
@@ -288,6 +298,7 @@ export interface FileRouteTypes {
     | '/read/$bookId'
     | '/series/$seriesId'
     | '/settings/account'
+    | '/settings/bring'
     | '/settings/libraries'
     | '/settings/server'
     | '/settings/tokens'
@@ -315,6 +326,7 @@ export interface FileRouteTypes {
     | '/read/$bookId'
     | '/series/$seriesId'
     | '/settings/account'
+    | '/settings/bring'
     | '/settings/libraries'
     | '/settings/server'
     | '/settings/tokens'
@@ -477,6 +489,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsAccountRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/bring': {
+      id: '/settings/bring'
+      path: '/bring'
+      fullPath: '/settings/bring'
+      preLoaderRoute: typeof SettingsBringRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/libraries': {
       id: '/settings/libraries'
       path: '/libraries'
@@ -531,6 +550,7 @@ declare module '@tanstack/react-router' {
 
 interface SettingsRouteChildren {
   SettingsAccountRoute: typeof SettingsAccountRoute
+  SettingsBringRoute: typeof SettingsBringRoute
   SettingsLibrariesRoute: typeof SettingsLibrariesRoute
   SettingsServerRoute: typeof SettingsServerRoute
   SettingsTokensRoute: typeof SettingsTokensRoute
@@ -540,6 +560,7 @@ interface SettingsRouteChildren {
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsAccountRoute: SettingsAccountRoute,
+  SettingsBringRoute: SettingsBringRoute,
   SettingsLibrariesRoute: SettingsLibrariesRoute,
   SettingsServerRoute: SettingsServerRoute,
   SettingsTokensRoute: SettingsTokensRoute,

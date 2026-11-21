@@ -31,6 +31,7 @@ it, so nobody has to guess later or reopen it by accident.
 | [0023](0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md) | Want to read is a person's own, and leaves out what was read | Accepted |
 | [0024](0024-a-library-makes-lists-and-collections-from-what-its-files-say.md) | A library makes lists and collections from what its files say | Accepted |
 | [0025](0025-views-go-and-a-collection-can-be-a-row-on-home.md) | Views go, and a collection can be a row on Home | Accepted |
+| [0026](0026-another-server-is-read-once-to-bring-a-person-over.md) | Another server is read once, to bring a person over | Accepted |
 
 ## Adding one
 

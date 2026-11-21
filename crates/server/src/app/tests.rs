@@ -79,6 +79,7 @@ async fn new_server() -> Server {
         accounts: Accounts::new(db.clone()).without_waits(),
         backups: binge_core::Backups::new(db.clone(), &data),
         updates: Updates::new(db.clone(), update::Setup::nowhere(&data)),
+        bringing: crate::bring::Bringing::new(catalog.clone()),
         db,
         catalog: catalog.clone(),
         allowed_hosts: AllowedHosts::new(["nas.local".to_owned()]),
@@ -4133,4 +4134,274 @@ async fn a_library_makes_lists_and_collections_from_its_files_when_asked() {
         .put("/api/v1/libraries/999/from-files", nothing)
         .await;
     assert_eq!(missing.status, StatusCode::NOT_FOUND);
+}
+
+/// A stand-in for the server someone is leaving: it answers what a Kavita
+/// server is asked, for a library whose folder is `/manga/Comics` there.
+/// `sizes` are the sizes of the three files it names. Returns its address.
+async fn other_server(sizes: [u64; 3]) -> String {
+    use axum::Json;
+    use axum::extract::Query;
+    use axum::http::Uri;
+    use std::collections::HashMap;
+
+    let answer = move |method: Method, uri: Uri, headers: HeaderMap| async move {
+        let asked: HashMap<String, String> = Query::try_from_uri(&uri).unwrap().0;
+        if uri.path() == "/api/Plugin/authenticate" {
+            if asked.get("apiKey").map(String::as_str) != Some("the key") {
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+            let signed_in = json!({
+                "username": "ana", "token": "a token", "kavitaVersion": "0.8.9.1",
+            });
+            return Ok(Json(signed_in));
+        }
+        let shown = headers.get(header::AUTHORIZATION);
+        if shown.and_then(|shown| shown.to_str().ok()) != Some("Bearer a token") {
+            return Err(StatusCode::UNAUTHORIZED);
+        }
+        let file = |id: i64, path: &str, size: u64| json!({ "id": id, "filePath": path, "pages": 2, "bytes": size });
+        let said = match (method.as_str(), uri.path()) {
+            ("GET", "/api/Account") => json!({ "roles": ["Admin"] }),
+            ("GET", "/api/Library/libraries") => {
+                json!([{ "id": 1, "name": "comics", "folders": ["/manga/Comics"] }])
+            }
+            ("POST", "/api/Series/all-v2") => json!([
+                { "id": 10, "name": "Patrol", "libraryId": 1 },
+                { "id": 11, "name": "Gone", "libraryId": 1 },
+            ]),
+            ("POST", "/api/want-to-read/v2") => json!([{ "id": 11 }]),
+            ("GET", "/api/Series/volumes") if asked["seriesId"] == "10" => json!([{
+                "chapters": [
+                    {
+                        "id": 100, "pages": 2, "pagesRead": 2,
+                        "lastReadingProgressUtc": "2024-02-29T12:10:00",
+                        "files": [file(1000, "/manga/Comics/Patrol/Patrol 001.cbz", sizes[0])],
+                    },
+                    {
+                        // Somewhere else there than here.
+                        "id": 101, "pages": 2, "pagesRead": 1,
+                        "lastReadingProgressUtc": "2024-03-01T00:00:00",
+                        "files": [file(1001, "/manga/Comics/Moved/Patrol 002.cbz", sizes[1])],
+                    },
+                ],
+            }]),
+            ("GET", "/api/Series/volumes") => json!([{
+                "chapters": [{
+                    "id": 110, "pages": 2, "pagesRead": 0,
+                    "lastReadingProgressUtc": "0001-01-01T00:00:00",
+                    "files": [file(1100, "/manga/Comics/Gone/Gone 001.cbz", sizes[2])],
+                }],
+            }]),
+            ("GET", "/api/Stats/reading-history") => json!([
+                {
+                    "isGeneratedSession": false,
+                    "startTimeUtc": "2024-02-29T12:00:00",
+                    "chapters": [{
+                        "chapterId": 100, "startTimeUtc": "2024-02-29T12:00:00",
+                        "endTimeUtc": "2024-02-29T12:10:00", "durationSeconds": 600,
+                        "startPage": 0, "endPage": 1,
+                    }],
+                },
+                {
+                    // What that server made up for a day it did not time.
+                    "isGeneratedSession": false,
+                    "startTimeUtc": "2024-03-01T00:00:00",
+                    "chapters": [{
+                        "chapterId": 101, "startTimeUtc": "2024-03-01T00:00:00",
+                        "endTimeUtc": "2024-03-01T00:20:00", "durationSeconds": 1200,
+                        "startPage": 0, "endPage": 0,
+                    }],
+                },
+            ]),
+            ("POST", "/api/ReadingList/lists") => json!([
+                { "id": 5, "title": "Crossover", "promoted": true, "ownerUserName": "ana" },
+            ]),
+            ("GET", "/api/ReadingList/items") => json!([
+                { "order": 1, "chapterId": 101 },
+                { "order": 0, "chapterId": 100 },
+            ]),
+            ("GET", "/api/Collection") => json!([
+                { "id": 7, "title": "Heroes", "promoted": false, "owner": "ana" },
+            ]),
+            ("GET", "/api/Series/series-by-collection") => json!([{ "id": 10 }]),
+            ("POST", "/api/Reader/all-bookmarks") => json!([{ "page": 1, "chapterId": 100 }]),
+            ("GET", "/api/Users") => json!([
+                {
+                    "id": 1, "username": "ana", "roles": ["Admin"],
+                    "libraries": [{ "id": 1 }], "ageRestriction": { "ageRating": -1 },
+                },
+                {
+                    "id": 2, "username": "kid", "roles": ["Pleb"],
+                    "libraries": [{ "id": 1 }], "ageRestriction": { "ageRating": 3 },
+                },
+            ]),
+            _ => return Err(StatusCode::NOT_FOUND),
+        };
+        Ok(Json(said))
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    tokio::spawn(async move {
+        axum::serve(listener, Router::new().fallback(answer))
+            .await
+            .unwrap();
+    });
+    address
+}
+
+impl Server {
+    /// Reads another server as whoever is asking, and returns where that
+    /// stands once it has ended.
+    async fn bring_from(&self, address: &str, key: &str) -> Value {
+        let asked = json!({ "from": "kavita", "address": address, "key": key });
+        let started = self.post("/api/v1/bring", asked).await;
+        assert_eq!(started.status, StatusCode::ACCEPTED);
+        loop {
+            let status = self.get("/api/v1/bring").await.json();
+            if status["reading"] == false {
+                return status;
+            }
+            tokio::task::yield_now().await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn another_server_is_read_and_shown_before_anything_is_made_of_it() {
+    let server = server().await;
+    let files = ["Patrol/Patrol 001.cbz", "Patrol/Patrol 002.cbz"];
+    for (seed, file) in files.iter().enumerate() {
+        fixtures::write_book(&server.comics.join(file), 2, seed as u8 + 1);
+    }
+    let comics = server.add_library().await;
+    let size = |file: &str| std::fs::metadata(server.comics.join(file)).unwrap().len();
+    let other = other_server([size(files[0]), size(files[1]), 12_345]).await;
+
+    // Nothing was read yet, and only the owner reads another server.
+    let nothing = server.get("/api/v1/bring").await.json();
+    assert_eq!(nothing["reading"], false);
+    assert!(nothing["brought"].is_null());
+    server.add_user("Ben", &[comics]).await;
+    let ben = server.signed_in_as("Ben", PASSWORD).await;
+    let refused = ben.get("/api/v1/bring").await;
+    assert_refused(
+        &refused,
+        StatusCode::FORBIDDEN,
+        "forbidden",
+        "not the owner",
+    );
+
+    // A key the other server does not take says so, and keeps nothing.
+    let wrong = server.bring_from(&other, "another key").await;
+    assert!(wrong["problem"].as_str().unwrap().contains("key"));
+    assert!(wrong["brought"].is_null());
+    let nowhere = json!({ "from": "kavita", "address": "ftp://x", "key": "k" });
+    let unread = server.post("/api/v1/bring", nowhere).await;
+    assert_refused(
+        &unread,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "no address",
+    );
+
+    let status = server.bring_from(&other, "the key").await;
+    assert!(status["problem"].is_null(), "{status}");
+    assert_eq!(
+        (&status["series_read"], &status["series_total"]),
+        (&json!(2), &json!(2))
+    );
+    let brought = &status["brought"];
+    assert_eq!(brought["from"], "kavita");
+    assert_eq!(brought["address"], format!("http://{other}"));
+    assert_eq!(brought["version"], "0.8.9.1");
+    assert_eq!(brought["their_name"], "ana");
+    assert_eq!(brought["manages"], true);
+    // The library there is taken for the one here of the same name: its
+    // folder is another to that server. One file sits where it does here,
+    // one is told by its name and size, and one is not here.
+    assert_eq!(
+        brought["libraries"],
+        json!([{
+            "their_id": 1,
+            "name": "comics",
+            "folders": ["/manga/Comics"],
+            "library_id": comics,
+            "books": 3,
+            "by_path": 1,
+            "by_file": 1,
+            "missing": ["Gone/Gone 001.cbz"],
+        }])
+    );
+    // What was read there: one book to the end and one begun, both here.
+    // One stretch was timed, at ten minutes; the other is only a day.
+    assert_eq!(
+        brought["reading"],
+        json!({
+            "started": 1,
+            "finished": 1,
+            "found": 2,
+            "timed": 1,
+            "seconds": 600,
+            "dated": 1,
+            "first_at": 1_709_208_000,
+            "last_at": 1_709_251_200,
+        })
+    );
+    assert_eq!(
+        (
+            &brought["lists"],
+            &brought["collections"],
+            &brought["wanted"],
+            &brought["pages"]
+        ),
+        (&json!(1), &json!(1), &json!(1), &json!(1))
+    );
+    assert_eq!(
+        brought["people"],
+        json!([
+            { "name": "ana", "manages": true, "limited": false, "libraries": ["comics"] },
+            { "name": "kid", "manages": false, "limited": true, "libraries": ["comics"] },
+        ])
+    );
+    // Nothing of it is reading here.
+    let read = server.get("/api/v1/continue-reading").await.json();
+    assert_eq!(read, json!([]));
+
+    // The owner says which library is which, or that none is.
+    let at = "/api/v1/bring/libraries/1";
+    let none = server.put(at, json!({ "library_id": null })).await.json();
+    let library = &none["brought"]["libraries"][0];
+    assert_eq!(
+        (&library["by_path"], &library["by_file"]),
+        (&json!(0), &json!(0))
+    );
+    assert_eq!(none["brought"]["reading"]["found"], 0);
+    let unknown = server.put(at, json!({ "library_id": 999 })).await;
+    assert_refused(
+        &unknown,
+        StatusCode::BAD_REQUEST,
+        "invalid_request",
+        "no such library",
+    );
+    let again = server.put(at, json!({ "library_id": comics })).await.json();
+    assert_eq!(again["brought"]["libraries"][0]["by_path"], 1);
+    let missing = server
+        .put("/api/v1/bring/libraries/9", json!({ "library_id": null }))
+        .await;
+    assert_eq!(missing.status, StatusCode::NOT_FOUND);
+
+    // What the owner said holds when the same server is read again, where
+    // this server would take the library for the one of its name.
+    server.put(at, json!({ "library_id": null })).await;
+    let again = server.bring_from(&other, "the key").await;
+    assert!(again["problem"].is_null(), "{again}");
+    assert!(again["brought"]["libraries"][0]["library_id"].is_null());
+
+    // What was read is forgotten when asked.
+    let forgotten = server.delete("/api/v1/bring").await;
+    assert_eq!(forgotten.status, StatusCode::NO_CONTENT);
+    assert!(server.get("/api/v1/bring").await.json()["brought"].is_null());
+    let twice = server.delete("/api/v1/bring").await;
+    assert_eq!(twice.status, StatusCode::NOT_FOUND);
 }

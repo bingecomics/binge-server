@@ -11,6 +11,7 @@ use binge_core::{AccountError, BackupError, CatalogError};
 use serde::Serialize;
 use utoipa::ToSchema;
 
+use crate::bring::BringError;
 use crate::update::UpdateError;
 
 /// What went wrong, as an identifier clients can branch on.
@@ -260,6 +261,20 @@ impl From<BackupError> for ApiError {
     fn from(error: BackupError) -> Self {
         // Nothing the caller sent decides whether a copy can be written.
         Self::of_core(None, &error, error.for_people())
+    }
+}
+
+impl From<BringError> for ApiError {
+    fn from(error: BringError) -> Self {
+        let code = match &error {
+            BringError::BadAddress => Some(ErrorCode::InvalidRequest),
+            // The request is fine; a reading under way is in its way.
+            BringError::Busy => Some(ErrorCode::Conflict),
+            // What the other server did is told where the reading stands,
+            // not as the answer to a request.
+            _ => None,
+        };
+        Self::of_core(code, &error, error.for_people())
     }
 }
 

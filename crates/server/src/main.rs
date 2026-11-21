@@ -2,6 +2,7 @@
 
 mod api;
 mod app;
+mod bring;
 mod built;
 mod config;
 mod health_check;
@@ -19,11 +20,28 @@ use clap::Parser;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::filter::LevelFilter;
 
 use crate::app::AppState;
 use crate::config::{Cli, Command, ServeArgs};
 use crate::host::AllowedHosts;
 use crate::update::Updates;
+
+/// The log's filter, with the HTTP client kept from its finest level when
+/// that was asked for: there it logs every address it asks and every byte
+/// it sends, and a key a person gave can be among them.
+fn without_what_is_sent(filter: EnvFilter) -> EnvFilter {
+    if filter
+        .max_level_hint()
+        .is_some_and(|finest| finest < LevelFilter::TRACE)
+    {
+        return filter;
+    }
+    ["ureq=debug", "ureq_proto=debug"]
+        .into_iter()
+        .filter_map(|directive| directive.parse().ok())
+        .fold(filter, EnvFilter::add_directive)
+}
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -72,7 +90,9 @@ const TO_CLOSE_THE_DATABASE: Duration = Duration::from_secs(5);
 /// there is a newer one than this, as this one otherwise.
 fn run(args: ServeArgs) -> Result<()> {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(without_what_is_sent(filter))
+        .init();
 
     let data_dir = args.data_dir()?;
     std::fs::create_dir_all(&data_dir)
@@ -136,6 +156,7 @@ async fn serve(args: ServeArgs, data_dir: PathBuf, updating: update::Setup) -> R
 
     let state = AppState {
         db: db.clone(),
+        bringing: bring::Bringing::new(catalog.clone()),
         catalog,
         accounts,
         backups,

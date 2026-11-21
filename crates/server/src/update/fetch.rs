@@ -1,6 +1,8 @@
 //! Asking the place releases are published at, and fetching from it.
 //!
-//! This is the only part of the server that calls an address outside it.
+//! With reading the server a person is leaving (`crate::bring`), which
+//! happens only when asked, this is the only part of the server that calls
+//! an address outside it.
 //! What it sends is the request for a file and the server's version, as
 //! the name of the program that asks. Nothing of a library or of a person.
 

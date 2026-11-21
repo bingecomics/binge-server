@@ -3,6 +3,7 @@
 mod account;
 mod auth;
 mod backups;
+mod bring;
 mod browse;
 mod collections;
 mod covers;
@@ -62,6 +63,7 @@ const V1: &str = "/v1";
         (name = "lists", description = "Reading lists, and making one from a CBL file"),
         (name = "collections", description = "Collections: series picked by hand, from any library"),
         (name = "people", description = "Who the books name, and the names they go by"),
+        (name = "bring", description = "Bringing what a person has on the server they are leaving"),
     )
 )]
 struct ApiDoc;
@@ -114,6 +116,7 @@ fn guarded() -> OpenApiRouter<AppState> {
         .merge(favorites::routes())
         .merge(scans::routes())
         .merge(backups::routes())
+        .merge(bring::routes())
         .merge(updates::routes())
 }
 

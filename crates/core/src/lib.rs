@@ -7,6 +7,7 @@
 pub mod accounts;
 mod archive;
 pub mod backup;
+pub mod brought;
 pub mod catalog;
 pub mod cbl;
 pub mod changes;
@@ -37,6 +38,10 @@ pub mod fixtures;
 
 pub use accounts::{Account, AccountError, Accounts, ApiToken, User, UserId, UserName};
 pub use backup::{BackupError, Backups, COPIES_KEPT, DatabaseCopy};
+pub use brought::{
+    Brought, BroughtLibrary, BroughtPerson, BroughtReading, Taken, TakenBook, TakenCollection,
+    TakenLibrary, TakenList, TakenPage, TakenPerson, TakenReading, TakenSeries, TakenSitting,
+};
 pub use catalog::{
     Book, Catalog, CatalogError, Group, GroupKind, HeldFile, Library, PartOf, Series, Span,
 };

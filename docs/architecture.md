@@ -60,8 +60,11 @@ iteration 6 will be a third crate on top of the same core, next to
 | `update.rs` | The server's own updates: looking for a newer version, fetching it, and asking for the start that runs it |
 | `update/release.rs` | What a release says of itself, and the check that one of the keys built in signed it |
 | `update/store.rs` | The versions kept in `updates/` in the data directory, each proven again before it is started |
-| `update/fetch.rs` | The requests to where releases are published: the only place the server calls out |
+| `update/fetch.rs` | The requests to where releases are published. With `bring/`, the only places the server calls out |
 | `update/handover.rs` | Starting another binary of the server in the place of the one that runs |
+| `api/bring.rs` | The owner's routes for bringing what they have on the server they are leaving |
+| `bring.rs` | Reading another server for a person, in the background, and where each reading stands |
+| `bring/kavita.rs` | What is asked of a Kavita server, and how its answers become the one shape the core keeps |
 | `api/layout.rs` | The owner's routes that change series, groups and where books sit |
 | `api/session.rs`, `api/account.rs`, `api/users.rs` | The routes for setup and signing in, for one's own password and tokens, and for the owner to manage users |
 | `host.rs` | Refuses requests addressed to a host name the server does not know |
@@ -97,6 +100,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `from_files.rs` | The reading lists and collections a library makes from the arcs and groups its files name |
 | `sharing.rs` | What reading lists and collections share: whose a thing is, and who it is shared with |
 | `cbl.rs` | Reads a CBL file and finds the book each of its entries means; writes a reading list as one |
+| `brought.rs` | What was read from the server a person is leaving: kept as it was read, matched to the libraries and books here, and counted |
 | `natural.rs` | Name order where "Issue 2" comes before "Issue 10", and a name with an accent sits with its letter |
 | `fixtures.rs` | Makes small comics for tests. Compiled for tests only |
 
@@ -215,6 +219,8 @@ The routes today:
 | `POST /reading-lists/import` | Asks what a CBL file would make: the body is the file. Nothing is made |
 | `POST /reading-lists/import/rules`, `DELETE /reading-lists/import/rules/{id}` | Keeps what the caller says an entry of a CBL file means, for their imports from now on; forgets it |
 | `GET /users/names` | Everyone on the server by name and id, for any caller: who something can be shared with |
+| `GET /bring`, `POST /bring`, `DELETE /bring` | The owner asks where they stand with the server they are leaving; has it read, with its address and their key there; forgets what was read |
+| `PUT /bring/libraries/{their_id}` | The owner says which library here holds the folder of a library of the other server |
 
 Lists that grow with the library are read a part at a time, by `offset`
 and `limit` (100 when left out, 500 at most), and answer with the `total`:
@@ -949,6 +955,65 @@ when its owner asks it to
 a library and its row in Settings open the same two choices. The page of
 a list or a collection the files made says so to its owner.
 
+### Coming from another server
+
+A person brings what they have on the server they are leaving
+([ADR 0026](adr/0026-another-server-is-read-once-to-bring-a-person-over.md)).
+The first part is built: the other server is read, and what it said is
+shown. Nothing is made of it yet. Kavita is the server it reads.
+
+- **Reading.** `POST /bring` takes the kind of server, its address and
+  the caller's key there, and answers at once. `crates/server/src/bring.rs`
+  reads in the background, one reading per person at a time, and
+  `GET /bring` says how far it is (the series asked, of all) and, when it
+  stopped, why. The key goes to that server only and is not kept, logged
+  or put in an error: the HTTP client is kept from its finest log level,
+  where it would print what it sends. An address that does not read is
+  refused before anything is asked, and the address is kept with what
+  was read.
+- **What is asked** (`bring/kavita.rs`), every request a reading one: who
+  the key is, the libraries with their folders, their series, the files
+  of every series with their size and pages and how far the person read
+  each, what they want to read, their reading lists and collections, the
+  pages they marked, their stretches of reading and, with the key of
+  someone who manages that server, its people and the libraries each
+  reads. All of it becomes one shape the core knows (`Taken`), so the
+  core knows no other server.
+- **Reading keeps what it was.** Kavita times each stretch of reading
+  since 0.8.9; those come as they were timed. What it made up itself (a
+  book marked as read, or reading from before it timed anything) comes
+  with its day only: no time spent, and nothing about how fast the
+  person reads. An older version is not asked for stretches. A chapter
+  that has none and has the day it was last read counts as read that
+  day, which the core works out from what was kept.
+- **Kept as it was read.** `Catalog::keep_brought` writes it to the
+  `brought_*` tables in one go, in place of what the person had read
+  before. Only a reading that got to its end is kept.
+- **Libraries.** A library there is taken for the one here with the same
+  folder or else the same name, among the libraries the person reads.
+  Two servers rarely see a folder under the same path, so the owner puts
+  it right with `PUT /bring/libraries/{their_id}`. What the owner said
+  holds when the same server, by its address, is read again.
+- **Books.** A file there is a book here when it sits at the same place
+  under its library's folder, or else when it has the same name and size,
+  the number of pages deciding between several. Only books whose pages
+  were read count, since everything hangs on a book's identity. The
+  match is worked out each time it is asked for, so it follows the scan.
+- **The report.** `GET /bring` gives, with the above, for each library
+  its files, how many are books here by place and by file, and where
+  some of the missing ones are; what the person finished and started and
+  how much of that is of books here; the stretches of reading, timed and
+  dated; and how many lists, collections, series wanted and marked pages
+  there are, and the people. It is left out while another reading is
+  under way.
+- **In the web app.** Settings has "Bring from Kavita" for the owner: the
+  address and the key, how far the reading is, and the report, where the
+  owner picks the library here for each library there.
+
+Asking leaves a trace on the other server: it sees a client called Binge
+Server, and newer versions of it note when the key's person was last
+seen.
+
 ## Reading and progress
 
 **Pages.** `GET /books/{id}/pages` lists a book's pages with the width and
@@ -1181,7 +1246,9 @@ The parts, in `crates/server/src/update`:
 1. *Looking.* The server fetches `update.json` and its signature from the
    latest release on GitHub and reads the version in it. It does this when
    the owner asks, and once a day while the owner has that on. It is off
-   at first: this is the only request the server makes to the outside.
+   at first: with reading the server a person is leaving, which happens
+   only when asked, this is the only request the server makes to the
+   outside.
 2. *Fetching.* The button names the version the owner was shown. When
    another came out since, nothing is fetched and that one is shown.
    Otherwise the server fetches the archive the file names for its system, compares its checksum, takes the binary out,
@@ -1250,6 +1317,10 @@ names. The server listens on `127.0.0.1` unless told otherwise; `--bind
   `user_setting` (a value a person keeps under a key),
   `scan_record` and `scan_change` (a scan that changed a library; one
   file it found arrived, back, moved or gone),
+  `bringing` and the `brought_*` tables (what a person had read from the
+  server they are leaving, as it was read: its libraries and folders,
+  series, files, reading, stretches of reading, lists, collections,
+  marked pages and people),
   and `setting` for the server's own key and value pairs. A `book` also
   says when it was set aside, if it could not be read and was.
 - **Copies of the database.** `crates/core/src/backup.rs` copies the
@@ -1292,6 +1363,9 @@ What it does not do:
   reset command yet.
 - **The owner can add any folder the server's account can read** as a
   library. The owner's account is as strong as its password.
+- **The owner can have the server ask any address it reaches**, by giving
+  it as the server they are leaving. Only the owner can, and what comes
+  back is shown only when it reads as that kind of server.
 
 ## Planned, not built
 
@@ -1337,3 +1411,4 @@ Listed here so the parts above make sense. Details are in
 | [0023](adr/0023-want-to-read-is-a-persons-own-and-leaves-out-what-was-read.md) | Want to read is a person's own, and leaves out what was read |
 | [0024](adr/0024-a-library-makes-lists-and-collections-from-what-its-files-say.md) | A library makes lists and collections from what its files say |
 | [0025](adr/0025-views-go-and-a-collection-can-be-a-row-on-home.md) | Views go, and a collection can be a row on Home |
+| [0026](adr/0026-another-server-is-read-once-to-bring-a-person-over.md) | Another server is read once, to bring a person over |

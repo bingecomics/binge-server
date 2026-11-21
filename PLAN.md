@@ -818,9 +818,32 @@ Built (2026-11-21): everything below
   sees the collection, and each person moves it or puts it away where
   they arrange Home.
 
+### Coming from another server (P2)
+
+Written 2026-11-21, with the owner, who put this step before the MCP
+server too. What is written here is what is built; it grows as the parts
+land ([ADR 0026](docs/adr/0026-another-server-is-read-once-to-bring-a-person-over.md)).
+
+#### P2. Reading the other server
+
+Built (2026-11-21): everything below.
+
+- The owner gives the address of the Kavita server they are leaving and
+  their key there, in Settings. The server reads it and changes nothing
+  there. The key is not kept.
+- What it found is shown before anything is made of it: the libraries and
+  which of this server's each is, how many of the files are books here
+  and which are not, what the person read and when, and how many lists,
+  collections, series wanted, marked pages and people there are.
+- A library is matched by its folder or its name, and the owner puts it
+  right. A book is matched by its place under the library's folder, or
+  else by its name and size.
+- Reading the other server timed comes as it was timed, and the rest
+  with its day only.
+
 ### Later, in outline only
 
-These follow the web app steps and P1 above.
+These follow the web app steps, P1 and P2 above.
 
 6. MCP server: read-only library tools, the operations that change the
    layout, page images, the current reading session.

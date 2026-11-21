@@ -705,6 +705,200 @@
         }
       }
     },
+    "/api/v1/bring": {
+      "get": {
+        "tags": [
+          "bring"
+        ],
+        "summary": "Says where the caller stands with the server they are leaving: whether\nit is being read, why the last reading stopped, and what the last one\nthat was done found. Only the owner can ask.",
+        "operationId": "getBringStatus",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BringStatus"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bring"
+        ],
+        "summary": "Starts reading the server the caller is leaving, and answers at once.\n`GET /bring` says how far it is, and in `problem` why it stopped when it\ncould not be done.",
+        "description": "The other server is asked for its libraries and their files, what the\ncaller has read there and when, their reading lists, collections, want\nto read and marked pages, and, with the key of someone who manages it,\nwho uses it. Nothing is changed there. What it said is kept in place of\nwhat was read before, and nothing is made of it here yet. The key is not\nkept. Only the owner can.",
+        "operationId": "startBringing",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BringAsked"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BringStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The address does not read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The other server is being read already",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "bring"
+        ],
+        "summary": "Forgets what was read from the other server. What was already made of\nit here stays. Only the owner can.",
+        "operationId": "forgetBrought",
+        "responses": {
+          "204": {
+            "description": "It is forgotten"
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing was read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bring/libraries/{their_id}": {
+      "put": {
+        "tags": [
+          "bring"
+        ],
+        "summary": "Says which library here holds the folder of a library of the other\nserver, or that none does. Its files are then looked for in that\nlibrary, and what was said holds when the same server is read again.\nOnly the owner can.",
+        "description": "Two servers rarely see a folder under the same path, so the one this\nserver took it for can be wrong.",
+        "operationId": "sayBroughtLibrary",
+        "parameters": [
+          {
+            "name": "their_id",
+            "in": "path",
+            "description": "The library's id on the other server",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibraryHere"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BringStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The library named is not on this server",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the owner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing was read, or it has no such library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/collections": {
       "get": {
         "tags": [
@@ -6873,6 +7067,307 @@
           }
         }
       },
+      "BringAsked": {
+        "type": "object",
+        "required": [
+          "from",
+          "address",
+          "key"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The other server's address, as it is opened in a browser.",
+            "maxLength": 2000
+          },
+          "from": {
+            "$ref": "#/components/schemas/BringFrom"
+          },
+          "key": {
+            "type": "string",
+            "description": "The caller's key there. It is used to read that server and is not\nkept.",
+            "maxLength": 2000
+          }
+        }
+      },
+      "BringFrom": {
+        "type": "string",
+        "description": "Which kind of server is read.",
+        "enum": [
+          "kavita"
+        ]
+      },
+      "BringStatus": {
+        "type": "object",
+        "description": "Where the caller stands with the server they are leaving.",
+        "required": [
+          "reading",
+          "series_read",
+          "series_total"
+        ],
+        "properties": {
+          "brought": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Brought",
+                "description": "What the last reading that was done found. Left out while another\nis under way."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last reading stopped, when it could not be done."
+          },
+          "reading": {
+            "type": "boolean",
+            "description": "Whether the other server is being read now."
+          },
+          "series_read": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How far that is: the series whose files were asked for, of all.",
+            "minimum": 0
+          },
+          "series_total": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          }
+        }
+      },
+      "Brought": {
+        "type": "object",
+        "description": "What was read from the other server.",
+        "required": [
+          "from",
+          "address",
+          "version",
+          "their_name",
+          "manages",
+          "taken_at",
+          "libraries",
+          "reading",
+          "lists",
+          "collections",
+          "wanted",
+          "pages",
+          "people"
+        ],
+        "properties": {
+          "address": {
+            "type": "string"
+          },
+          "collections": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "from": {
+            "type": "string",
+            "description": "Which kind of server it is, as it was asked for, and its address."
+          },
+          "libraries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BroughtLibrary"
+            }
+          },
+          "lists": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The reading lists and the collections they made or are shown."
+          },
+          "manages": {
+            "type": "boolean",
+            "description": "Whether their key is of someone who manages that server. Its people\nare read only then."
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The pages they marked."
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BroughtPerson"
+            }
+          },
+          "reading": {
+            "$ref": "#/components/schemas/BroughtReading"
+          },
+          "taken_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When it was read, in seconds since 1970."
+          },
+          "their_name": {
+            "type": "string",
+            "description": "The name the caller goes by there."
+          },
+          "version": {
+            "type": "string"
+          },
+          "wanted": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The series they want to read."
+          }
+        }
+      },
+      "BroughtLibrary": {
+        "type": "object",
+        "description": "A library of the other server, and how much of it this server holds.",
+        "required": [
+          "their_id",
+          "name",
+          "folders",
+          "books",
+          "by_path",
+          "by_file",
+          "missing"
+        ],
+        "properties": {
+          "books": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its files there."
+          },
+          "by_file": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The ones it holds somewhere else, told by their name and size."
+          },
+          "by_path": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The ones this server holds at the same place under the folder."
+          },
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its folders, as the other server sees them."
+          },
+          "library_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The library here that holds the same folder: the one it was taken\nfor, or the one the owner said."
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Some of the ones it does not hold: where each is under the folder."
+          },
+          "name": {
+            "type": "string"
+          },
+          "their_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its id there."
+          }
+        }
+      },
+      "BroughtPerson": {
+        "type": "object",
+        "description": "Someone who uses the other server.",
+        "required": [
+          "name",
+          "manages",
+          "limited",
+          "libraries"
+        ],
+        "properties": {
+          "libraries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The names of the libraries there that they read."
+          },
+          "limited": {
+            "type": "boolean",
+            "description": "Whether they are kept from some of what is there by age."
+          },
+          "manages": {
+            "type": "boolean",
+            "description": "Whether they manage that server."
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "BroughtReading": {
+        "type": "object",
+        "description": "What the caller has read on the other server.",
+        "required": [
+          "started",
+          "finished",
+          "found",
+          "timed",
+          "seconds",
+          "dated"
+        ],
+        "properties": {
+          "dated": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The reading it only knows the day of."
+          },
+          "finished": {
+            "type": "integer",
+            "format": "int64",
+            "description": "What they finished there."
+          },
+          "first_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "When the first and the last stretch started, in seconds since 1970."
+          },
+          "found": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many of those two are books this server holds."
+          },
+          "last_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The seconds those took together."
+          },
+          "started": {
+            "type": "integer",
+            "format": "int64",
+            "description": "What they started and did not finish there."
+          },
+          "timed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The stretches of reading that server timed."
+          }
+        }
+      },
       "CannotUpdate": {
         "type": "string",
         "description": "Why a server does not bring itself to a newer version.",
@@ -7711,6 +8206,19 @@
               "$ref": "#/components/schemas/NamedPerson"
             },
             "description": "The one most series name first."
+          }
+        }
+      },
+      "LibraryHere": {
+        "type": "object",
+        "properties": {
+          "library_id": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The library here that holds the same folder, or nothing when none\ndoes."
           }
         }
       },
@@ -9516,6 +10024,10 @@
     {
       "name": "people",
       "description": "Who the books name, and the names they go by"
+    },
+    {
+      "name": "bring",
+      "description": "Bringing what a person has on the server they are leaving"
     }
   ]
 }

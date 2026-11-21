@@ -7,6 +7,9 @@ export const api = createClient<paths>({ baseUrl: "/" });
 
 type Schemas = components["schemas"];
 export type Library = Schemas["Library"];
+export type BringStatus = Schemas["BringStatus"];
+export type Brought = Schemas["Brought"];
+export type BroughtLibrary = Schemas["BroughtLibrary"];
 export type ScanStatus = Schemas["ScanStatus"];
 export type Series = Schemas["Series"];
 export type Group = Schemas["Group"];

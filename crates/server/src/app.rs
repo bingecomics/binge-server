@@ -6,6 +6,7 @@ use axum::{Router, middleware};
 use binge_core::{Accounts, Backups, Catalog, Database};
 use tower_http::trace::TraceLayer;
 
+use crate::bring::Bringing;
 use crate::host::AllowedHosts;
 use crate::update::Updates;
 use crate::{api, host, ui};
@@ -17,6 +18,7 @@ pub struct AppState {
     pub accounts: Accounts,
     pub backups: Backups,
     pub updates: Updates,
+    pub bringing: Bringing,
     pub allowed_hosts: AllowedHosts,
 }
 

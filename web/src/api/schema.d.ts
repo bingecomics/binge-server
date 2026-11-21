@@ -238,6 +238,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Says where the caller stands with the server they are leaving: whether
+         *     it is being read, why the last reading stopped, and what the last one
+         *     that was done found. Only the owner can ask.
+         */
+        get: operations["getBringStatus"];
+        put?: never;
+        /**
+         * Starts reading the server the caller is leaving, and answers at once.
+         *     `GET /bring` says how far it is, and in `problem` why it stopped when it
+         *     could not be done.
+         * @description The other server is asked for its libraries and their files, what the
+         *     caller has read there and when, their reading lists, collections, want
+         *     to read and marked pages, and, with the key of someone who manages it,
+         *     who uses it. Nothing is changed there. What it said is kept in place of
+         *     what was read before, and nothing is made of it here yet. The key is not
+         *     kept. Only the owner can.
+         */
+        post: operations["startBringing"];
+        /**
+         * Forgets what was read from the other server. What was already made of
+         *     it here stays. Only the owner can.
+         */
+        delete: operations["forgetBrought"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/bring/libraries/{their_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Says which library here holds the folder of a library of the other
+         *     server, or that none does. Its files are then looked for in that
+         *     library, and what was said holds when the same server is read again.
+         *     Only the owner can.
+         * @description Two servers rarely see a folder under the same path, so the one this
+         *     server took it for can be wrong.
+         */
+        put: operations["sayBroughtLibrary"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/collections": {
         parameters: {
             query?: never;
@@ -2215,6 +2275,159 @@ export interface components {
              */
             writers: components["schemas"]["Credit"][];
         };
+        BringAsked: {
+            /** @description The other server's address, as it is opened in a browser. */
+            address: string;
+            from: components["schemas"]["BringFrom"];
+            /**
+             * @description The caller's key there. It is used to read that server and is not
+             *     kept.
+             */
+            key: string;
+        };
+        /**
+         * @description Which kind of server is read.
+         * @enum {string}
+         */
+        BringFrom: "kavita";
+        /** @description Where the caller stands with the server they are leaving. */
+        BringStatus: {
+            brought?: components["schemas"]["Brought"] | null;
+            /** @description Why the last reading stopped, when it could not be done. */
+            problem?: string | null;
+            /** @description Whether the other server is being read now. */
+            reading: boolean;
+            /**
+             * Format: int32
+             * @description How far that is: the series whose files were asked for, of all.
+             */
+            series_read: number;
+            /** Format: int32 */
+            series_total: number;
+        };
+        /** @description What was read from the other server. */
+        Brought: {
+            address: string;
+            /** Format: int64 */
+            collections: number;
+            /** @description Which kind of server it is, as it was asked for, and its address. */
+            from: string;
+            libraries: components["schemas"]["BroughtLibrary"][];
+            /**
+             * Format: int64
+             * @description The reading lists and the collections they made or are shown.
+             */
+            lists: number;
+            /**
+             * @description Whether their key is of someone who manages that server. Its people
+             *     are read only then.
+             */
+            manages: boolean;
+            /**
+             * Format: int64
+             * @description The pages they marked.
+             */
+            pages: number;
+            people: components["schemas"]["BroughtPerson"][];
+            reading: components["schemas"]["BroughtReading"];
+            /**
+             * Format: int64
+             * @description When it was read, in seconds since 1970.
+             */
+            taken_at: number;
+            /** @description The name the caller goes by there. */
+            their_name: string;
+            version: string;
+            /**
+             * Format: int64
+             * @description The series they want to read.
+             */
+            wanted: number;
+        };
+        /** @description A library of the other server, and how much of it this server holds. */
+        BroughtLibrary: {
+            /**
+             * Format: int64
+             * @description Its files there.
+             */
+            books: number;
+            /**
+             * Format: int64
+             * @description The ones it holds somewhere else, told by their name and size.
+             */
+            by_file: number;
+            /**
+             * Format: int64
+             * @description The ones this server holds at the same place under the folder.
+             */
+            by_path: number;
+            /** @description Its folders, as the other server sees them. */
+            folders: string[];
+            /**
+             * Format: int64
+             * @description The library here that holds the same folder: the one it was taken
+             *     for, or the one the owner said.
+             */
+            library_id?: number | null;
+            /** @description Some of the ones it does not hold: where each is under the folder. */
+            missing: string[];
+            name: string;
+            /**
+             * Format: int64
+             * @description Its id there.
+             */
+            their_id: number;
+        };
+        /** @description Someone who uses the other server. */
+        BroughtPerson: {
+            /** @description The names of the libraries there that they read. */
+            libraries: string[];
+            /** @description Whether they are kept from some of what is there by age. */
+            limited: boolean;
+            /** @description Whether they manage that server. */
+            manages: boolean;
+            name: string;
+        };
+        /** @description What the caller has read on the other server. */
+        BroughtReading: {
+            /**
+             * Format: int64
+             * @description The reading it only knows the day of.
+             */
+            dated: number;
+            /**
+             * Format: int64
+             * @description What they finished there.
+             */
+            finished: number;
+            /**
+             * Format: int64
+             * @description When the first and the last stretch started, in seconds since 1970.
+             */
+            first_at?: number | null;
+            /**
+             * Format: int64
+             * @description How many of those two are books this server holds.
+             */
+            found: number;
+            /** Format: int64 */
+            last_at?: number | null;
+            /**
+             * Format: int64
+             * @description The seconds those took together.
+             */
+            seconds: number;
+            /**
+             * Format: int64
+             * @description What they started and did not finish there.
+             */
+            started: number;
+            /**
+             * Format: int64
+             * @description The stretches of reading that server timed.
+             */
+            timed: number;
+        };
         /**
          * @description Why a server does not bring itself to a newer version.
          * @enum {string}
@@ -2655,6 +2868,14 @@ export interface components {
             publishers: components["schemas"]["NamedPublisher"][];
             /** @description The one most series name first. */
             writers: components["schemas"]["NamedPerson"][];
+        };
+        LibraryHere: {
+            /**
+             * Format: int64
+             * @description The library here that holds the same folder, or nothing when none
+             *     does.
+             */
+            library_id?: number | null;
         };
         ListPosition: {
             /**
@@ -4057,6 +4278,173 @@ export interface operations {
                     "application/json": components["schemas"]["ApiError"];
                 };
             };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    getBringStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BringStatus"];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    startBringing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BringAsked"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BringStatus"];
+                };
+            };
+            /** @description The address does not read */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The other server is being read already */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    forgetBrought: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description It is forgotten */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Nothing was read */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    sayBroughtLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The library's id on the other server */
+                their_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LibraryHere"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BringStatus"];
+                };
+            };
+            /** @description The library named is not on this server */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description The caller is not the owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Nothing was read, or it has no such library */
             404: {
                 headers: {
                     [name: string]: unknown;
