@@ -54,7 +54,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `api/people.rs` | The routes for the people books name, and for the owner to say who is who |
 | `api/settings.rs` | The routes for what each person chose in an app |
 | `api/history.rs` | The routes for what the caller read, and for the owner to see who reads now |
-| `api/kept.rs` | The routes for the pages the caller kept while reading |
+| `api/favorites.rs` | The routes for the caller's favorite pages |
 | `api/scans.rs`, `api/backups.rs` | The owner's routes for what scans changed and files set aside, and for the copies of the database |
 | `api/updates.rs` | The owner's routes for the server's own updates |
 | `update.rs` | The server's own updates: looking for a newer version, fetching it, and asking for the start that runs it |
@@ -86,7 +86,7 @@ iteration 6 will be a third crate on top of the same core, next to
 | `people.rs` | The people books name, the names they go by, and making two of them one |
 | `settings.rs` | What each person chose in an app, as keys and values the server does not read |
 | `history.rs` | What someone read, by day, month and writer, who is reading now, and how fast someone reads |
-| `kept.rs` | The pages a reader kept while reading |
+| `favorites.rs` | Favorite pages: the pages a reader marked while reading |
 | `changes.rs` | What each scan changed: the files that arrived, moved, went and came back |
 | `backup.rs` | Copies of the database in the data directory, made when asked and once a day |
 | `thumbnail.rs` | Makes and stores cover images, and makes a page small |
@@ -951,7 +951,7 @@ catalog twice, any copy that can be read will do.
 
 `/pages/{identity}/{number}/thumbnail` gives the page as a small picture:
 a JPEG that fits 320 by 480 pixels, for a strip of pages and for the card
-of a kept page. It is the one place a page is decoded and encoded again.
+of a favorite page. It is the one place a page is decoded and encoded again.
 The server makes it from the page each time it is asked and keeps no
 copy; it is cached for good like the page, with a tag of its own, so
 whoever asked keeps it. A page the server cannot decode has none.
@@ -973,19 +973,18 @@ there or not the caller's to read are passed over, and the answer says how
 many books changed. One request names 10,000 ids at most. In the core it is `Catalog::mark_read`, which a tool of
 the MCP server can call as it is.
 
-**Kept pages.** The web app calls them favorites and marks them with a
-heart; the API and the database call them kept pages. A reader keeps a
-page to find it again:
-`PUT /pages/{identity}/{number}/kept`, and `DELETE` to let it go. Like
-progress it is a row per reader, identity and page number with no link to
-the `book` table (`kept_page`), so it stays with the page when the file
-moves and is shared by two files with the same pages. One person keeps
-5,000 at most. `GET /books/{id}/kept-pages` gives the numbers kept in a
-book, and `GET /me/kept-pages` all of them a part at a time, each with
-its book: series by series in the order of their names, the books of a
-series as they are read, books in no series last. A page whose book is
-not on the server now is left out until the book is back. It is
-`crates/core/src/kept.rs`.
+**Favorite pages.** A reader makes a page a favorite to find it again,
+and the web app marks it with a heart:
+`PUT /pages/{identity}/{number}/favorite`, and `DELETE` to make it one no
+longer. Like progress it is a row per reader, identity and page number
+with no link to the `book` table (`favorite_page`), so it stays with the
+page when the file moves and is shared by two files with the same pages.
+One person has 5,000 at most. `GET /books/{id}/favorite-pages` gives the
+numbers of a book's, and `GET /me/favorite-pages` all of them a part at a
+time, each with its book: series by series in the order of their names,
+the books of a series as they are read, books in no series last. A page
+whose book is not on the server now is left out until the book is back.
+It is `crates/core/src/favorites.rs`.
 
 **Sittings.** Progress says where a reader is in a book and forgets where
 they were. So each save of progress also goes on a record of when they
@@ -1212,8 +1211,8 @@ names. The server listens on `127.0.0.1` unless told otherwise; `--bind
   `api_token` (a hash of the secret, its user, when it was last used),
   `progress` (one row per user and book identity: page, completed, when),
   `sitting` (one row per stretch of reading: user, book identity, when it
-  started and ended, first and last page), `kept_page` (a page a user
-  kept: book identity, page number, when), `off_up_next` (a series a user
+  started and ended, first and last page), `favorite_page` (a page a user
+  made a favorite: book identity, page number, when), `off_up_next` (a series a user
   took off their "Up next", and when), `book_cover`, `series_cover` and
   `reading_list_cover` (the cover chosen for a book identity; for a series;
   for a reading list), `reading_list` (whose it is, a name, a summary and

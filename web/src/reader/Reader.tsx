@@ -24,7 +24,7 @@ import {
 } from "react";
 import { useIsOwner } from "../api/account";
 import { type Book, type Page, pageUrl } from "../api/client";
-import { useKeepPage, useKeptIn } from "../api/kept";
+import { useFavoritesIn, useMarkFavorite } from "../api/favorites";
 import { useIsOwnList } from "../api/lists";
 import { usePageProblem, useSaveProgress } from "../api/reading";
 import { Button } from "../components/Button";
@@ -51,8 +51,8 @@ const ARROW_STEP = 0.15;
 
 const WIDER_THAN_TALL = "(min-aspect-ratio: 1/1)";
 
-/** What a book has kept until its kept pages have come. The same each time, for what compares it. */
-const NONE_KEPT: number[] = [];
+/** A book's favorites until they have come. The same each time, for what compares it. */
+const NO_FAVORITES: number[] = [];
 
 function watchWindowShape(onChange: () => void) {
   const query = window.matchMedia(WIDER_THAN_TALL);
@@ -309,18 +309,18 @@ export function Reader({
     }
   }, [recorded, page, last, save]);
 
-  // The pages of this book that were kept. With two on screen, the first
-  // is the one kept, and letting go lets go of both.
-  const kept = useKeptIn(book.id).data ?? NONE_KEPT;
-  const { mutate: keepPage } = useKeepPage();
-  const keptShown = shown.filter((number) => kept.includes(number));
-  const toggleKept = () => {
+  // The pages of this book that are favorites. With two on screen, the
+  // first is the one made a favorite, and removing removes both.
+  const favorites = useFavoritesIn(book.id).data ?? NO_FAVORITES;
+  const { mutate: markFavorite } = useMarkFavorite();
+  const favoritesShown = shown.filter((number) => favorites.includes(number));
+  const toggleFavorite = () => {
     const ofBook = { bookId: book.id, identity };
-    if (keptShown.length === 0) {
-      keepPage({ ...ofBook, number: first, keep: true });
+    if (favoritesShown.length === 0) {
+      markFavorite({ ...ofBook, number: first, favorite: true });
     }
-    for (const number of keptShown) {
-      keepPage({ ...ofBook, number, keep: false });
+    for (const number of favoritesShown) {
+      markFavorite({ ...ofBook, number, favorite: false });
     }
   };
   const pickFromStrip = useCallback((number: number) => goTo(number, "bars"), [goTo]);
@@ -617,16 +617,18 @@ export function Reader({
         </p>
         <button
           type="button"
-          onClick={toggleKept}
+          onClick={toggleFavorite}
           className={barButtonClass}
-          aria-pressed={keptShown.length > 0}
+          aria-pressed={favoritesShown.length > 0}
           aria-label="Favorite page"
           title={
-            keptShown.length > 0 ? "A favorite. Press to remove it" : "Add this page to favorites"
+            favoritesShown.length > 0
+              ? "A favorite. Press to remove it"
+              : "Add this page to favorites"
           }
         >
           <FavoriteIcon
-            className={`size-5 ${keptShown.length > 0 ? "fill-current" : ""}`}
+            className={`size-5 ${favoritesShown.length > 0 ? "fill-current" : ""}`}
             aria-hidden="true"
           />
         </button>
@@ -669,7 +671,7 @@ export function Reader({
             identity={identity}
             pages={pages}
             shown={shown}
-            kept={kept}
+            favorites={favorites}
             rightToLeft={rightToLeft}
             onPick={pickFromStrip}
           />

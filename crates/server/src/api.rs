@@ -7,9 +7,9 @@ mod browse;
 mod collections;
 mod covers;
 mod error;
+mod favorites;
 mod health;
 mod history;
-mod kept;
 mod layout;
 mod libraries;
 mod lists;
@@ -111,7 +111,7 @@ fn guarded() -> OpenApiRouter<AppState> {
         .merge(wanted::routes())
         .merge(settings::routes())
         .merge(history::routes())
-        .merge(kept::routes())
+        .merge(favorites::routes())
         .merge(scans::routes())
         .merge(backups::routes())
         .merge(updates::routes())

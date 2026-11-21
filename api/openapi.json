@@ -273,13 +273,13 @@
         }
       }
     },
-    "/api/v1/books/{id}/kept-pages": {
+    "/api/v1/books/{id}/favorite-pages": {
       "get": {
         "tags": [
           "reading"
         ],
-        "summary": "Lists the pages of a book that the caller kept, by their numbers from 0,\nin reading order.",
-        "operationId": "listKeptPagesOfBook",
+        "summary": "Lists the pages of a book that are favorites of the caller's, by their\nnumbers from 0, in reading order.",
+        "operationId": "listFavoritePagesOfBook",
         "parameters": [
           {
             "name": "id",
@@ -2646,13 +2646,13 @@
         }
       }
     },
-    "/api/v1/me/kept-pages": {
+    "/api/v1/me/favorite-pages": {
       "get": {
         "tags": [
           "reading"
         ],
-        "summary": "Lists a part of the pages the caller kept, with how many there are in\nall: series by series in the order of their names, and inside a series\nbook by book as they are read. The pages of books in no series come\nlast. A page of a book that is not on the server now is left out, and is\nlisted again when its book is back.",
-        "operationId": "listKeptPages",
+        "summary": "Lists a part of the caller's favorite pages, with how many there are in\nall: series by series in the order of their names, and inside a series\nbook by book as they are read. The pages of books in no series come\nlast. A page of a book that is not on the server now is left out, and is\nlisted again when its book is back.",
+        "operationId": "listFavoritePages",
         "parameters": [
           {
             "name": "offset",
@@ -2682,7 +2682,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PagedKeptPages"
+                  "$ref": "#/components/schemas/PagedFavoritePages"
                 }
               }
             }
@@ -2953,13 +2953,13 @@
         }
       }
     },
-    "/api/v1/pages/{identity}/{number}/kept": {
+    "/api/v1/pages/{identity}/{number}/favorite": {
       "put": {
         "tags": [
           "reading"
         ],
-        "summary": "Keeps a page for the caller. A page already kept stays as it was.",
-        "operationId": "keepPage",
+        "summary": "Makes a page a favorite of the caller's. A page that already is one\nstays as it was.",
+        "operationId": "addFavoritePage",
         "parameters": [
           {
             "name": "identity",
@@ -2983,10 +2983,10 @@
         ],
         "responses": {
           "204": {
-            "description": "The page is kept"
+            "description": "The page is a favorite"
           },
           "400": {
-            "description": "The caller keeps 5,000 pages already",
+            "description": "The caller has 5,000 favorite pages already",
             "content": {
               "application/json": {
                 "schema": {
@@ -3011,8 +3011,8 @@
         "tags": [
           "reading"
         ],
-        "summary": "Lets go of a page the caller kept. A page that was not kept is no error.",
-        "operationId": "letPageGo",
+        "summary": "Makes a page no longer a favorite of the caller's. A page that was not\none is no error.",
+        "operationId": "removeFavoritePage",
         "parameters": [
           {
             "name": "identity",
@@ -3036,7 +3036,7 @@
         ],
         "responses": {
           "204": {
-            "description": "The page is not kept"
+            "description": "The page is not a favorite"
           }
         }
       }
@@ -7242,6 +7242,30 @@
           "internal"
         ]
       },
+      "FavoritePage": {
+        "type": "object",
+        "description": "A favorite page of the caller's, with the book it is a page of.\n\nIt belongs to the book's `identity` and the page's number, like\nprogress: it stays with the page when the book's file is moved or\nrenamed. Everyone has their own.",
+        "required": [
+          "book",
+          "page",
+          "added_at"
+        ],
+        "properties": {
+          "added_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When it became a favorite, in seconds since 1970."
+          },
+          "book": {
+            "$ref": "#/components/schemas/Book"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The page, from 0. Its picture is at `/pages/{identity}/{number}`,\nand a small one at `/pages/{identity}/{number}/thumbnail`."
+          }
+        }
+      },
       "Followed": {
         "type": "string",
         "description": "What a book is read as a part of.",
@@ -7454,30 +7478,6 @@
               "$ref": "#/components/schemas/HeldFile"
             },
             "description": "Its files, in the order of their paths: two at least."
-          }
-        }
-      },
-      "KeptPage": {
-        "type": "object",
-        "description": "A page the caller kept, with the book it is a page of.\n\nIt belongs to the book's `identity` and the page's number, like\nprogress: it stays with the page when the book's file is moved or\nrenamed. Everyone has their own.",
-        "required": [
-          "book",
-          "page",
-          "kept_at"
-        ],
-        "properties": {
-          "book": {
-            "$ref": "#/components/schemas/Book"
-          },
-          "kept_at": {
-            "type": "integer",
-            "format": "int64",
-            "description": "When it was kept, in seconds since 1970."
-          },
-          "page": {
-            "type": "integer",
-            "format": "int64",
-            "description": "The page, from 0. Its picture is at `/pages/{identity}/{number}`,\nand a small one at `/pages/{identity}/{number}/thumbnail`."
           }
         }
       },
@@ -8032,9 +8032,9 @@
           }
         }
       },
-      "PagedKeptPages": {
+      "PagedFavoritePages": {
         "type": "object",
-        "description": "A part of the pages the caller kept.",
+        "description": "A part of the caller's favorite pages.",
         "required": [
           "pages",
           "total"
@@ -8043,7 +8043,7 @@
           "pages": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/KeptPage"
+              "$ref": "#/components/schemas/FavoritePage"
             }
           },
           "total": {

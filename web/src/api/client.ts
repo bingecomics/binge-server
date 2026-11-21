@@ -48,7 +48,7 @@ export type ScanChange = Schemas["ScanChange"];
 export type ChangeKind = Schemas["ChangeKind"];
 export type DatabaseCopies = Schemas["DatabaseCopies"];
 export type UpdateStatus = Schemas["UpdateStatus"];
-export type KeptPage = Schemas["KeptPage"];
+export type FavoritePage = Schemas["FavoritePage"];
 export type Followed = Schemas["Followed"];
 
 function isApiError(value: unknown): value is Schemas["ApiError"] {

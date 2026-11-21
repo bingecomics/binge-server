@@ -25,7 +25,7 @@ const MAX_HEIGHT: u32 = 720;
 const JPEG_QUALITY: u8 = 82;
 
 /// A page as a small picture fits this: enough for a strip of pages to
-/// jump by, and for a card that shows one kept page.
+/// jump by, and for a card that shows one favorite page.
 const PAGE_WIDTH: u32 = 320;
 const PAGE_HEIGHT: u32 = 480;
 const PAGE_QUALITY: u8 = 78;

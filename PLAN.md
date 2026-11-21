@@ -798,7 +798,8 @@ Built (2026-11-20): everything below.
 - Each of the four pages has the four as a row of choices over it. My
   Binge opens on want to read.
 - The pages a person kept while reading are called favorites, and their
-  mark is a heart. The API still calls them kept pages.
+  mark is a heart. Since 2026-11-21 the API and the database call them
+  favorite pages too.
 
 #### P1. Views go
 

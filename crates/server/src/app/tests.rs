@@ -3847,34 +3847,37 @@ async fn pages_are_kept_and_sent_small() {
         .await;
     assert_refused(&missing, StatusCode::NOT_FOUND, "not_found", "no such page");
 
-    // Kept pages are each reader's own.
-    let kept = format!("/api/v1/pages/{identity}/1/kept");
+    // Favorite pages are each reader's own.
+    let favorite = format!("/api/v1/pages/{identity}/1/favorite");
     assert_eq!(
-        ben.call(Method::PUT, &kept).await.status,
+        ben.call(Method::PUT, &favorite).await.status,
         StatusCode::NO_CONTENT
     );
     assert_eq!(
-        ben.call(Method::PUT, &kept).await.status,
+        ben.call(Method::PUT, &favorite).await.status,
         StatusCode::NO_CONTENT
     );
-    let of_book = format!("/api/v1/books/{id}/kept-pages");
+    let of_book = format!("/api/v1/books/{id}/favorite-pages");
     assert_eq!(ben.get(&of_book).await.json(), json!([1]));
     assert_eq!(server.get(&of_book).await.json(), json!([]));
 
-    let all = ben.get("/api/v1/me/kept-pages").await.json();
+    let all = ben.get("/api/v1/me/favorite-pages").await.json();
     assert_eq!(all["total"], 1);
     assert_eq!(all["pages"][0]["page"], 1);
     assert_eq!(all["pages"][0]["book"]["id"], id);
-    assert!(all["pages"][0]["kept_at"].as_i64().unwrap() > 0);
-    assert_eq!(server.get("/api/v1/me/kept-pages").await.json()["total"], 0);
+    assert!(all["pages"][0]["added_at"].as_i64().unwrap() > 0);
+    assert_eq!(
+        server.get("/api/v1/me/favorite-pages").await.json()["total"],
+        0
+    );
 
     let none = ben
-        .call(Method::PUT, &format!("/api/v1/pages/{identity}/2/kept"))
+        .call(Method::PUT, &format!("/api/v1/pages/{identity}/2/favorite"))
         .await;
     assert_refused(&none, StatusCode::NOT_FOUND, "not_found", "no such page");
 
-    assert_eq!(ben.delete(&kept).await.status, StatusCode::NO_CONTENT);
-    assert_eq!(ben.delete(&kept).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(ben.delete(&favorite).await.status, StatusCode::NO_CONTENT);
+    assert_eq!(ben.delete(&favorite).await.status, StatusCode::NO_CONTENT);
     assert_eq!(ben.get(&of_book).await.json(), json!([]));
 
     // Until someone has read enough, nobody can say how long they will take.

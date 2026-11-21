@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Info } from "lucide-react";
-import { type KeptPage, smallPageUrl } from "../api/client";
-import { KEPT_A_PAGE, useKeepPage, useKeptPages } from "../api/kept";
+import { type FavoritePage, smallPageUrl } from "../api/client";
+import { FAVORITES_A_PAGE, useFavoritePages, useMarkFavorite } from "../api/favorites";
 import { Card } from "../components/Card";
 import { coverGridClass } from "../components/Cover";
 import { MenuItem, MenuLink, MoreMenu } from "../components/Menu";
@@ -20,18 +20,18 @@ export const Route = createFileRoute("/favorites")({
 });
 
 /** The pages of one series, or of the books in no series, together under its name. */
-type OfSeries = { id: number | null; name: string; pages: KeptPage[] };
+type OfSeries = { id: number | null; name: string; pages: FavoritePage[] };
 
 /** Pages in the server's order, which has those of a series together, as one lot for each series. */
-function bySeries(pages: KeptPage[]): OfSeries[] {
+function bySeries(pages: FavoritePage[]): OfSeries[] {
   const lots: OfSeries[] = [];
-  for (const kept of pages) {
-    const id = kept.book.series_id ?? null;
+  for (const favorite of pages) {
+    const id = favorite.book.series_id ?? null;
     const last = lots[lots.length - 1];
     if (last && last.id === id) {
-      last.pages.push(kept);
+      last.pages.push(favorite);
     } else {
-      lots.push({ id, name: kept.book.series_name ?? "In no series", pages: [kept] });
+      lots.push({ id, name: favorite.book.series_name ?? "In no series", pages: [favorite] });
     }
   }
   return lots;
@@ -42,9 +42,9 @@ function bySeries(pages: KeptPage[]): OfSeries[] {
  * called under its series, and its number. It opens the book on that page
  * for a look, which moves no progress.
  */
-function FavoriteCard({ kept }: { kept: KeptPage }) {
-  const { book, page } = kept;
-  const { mutate: keepPage } = useKeepPage();
+function FavoriteCard({ favorite }: { favorite: FavoritePage }) {
+  const { book, page } = favorite;
+  const { mutate: markFavorite } = useMarkFavorite();
   const identity = book.identity;
   if (!identity) {
     return null;
@@ -60,7 +60,9 @@ function FavoriteCard({ kept }: { kept: KeptPage }) {
         search: { page: page + 1, unrecorded: true },
       }}
       picture={smallPageUrl(identity, page)}
-      standing={<p className="text-caption text-fg-muted">A favorite since {day(kept.kept_at)}</p>}
+      standing={
+        <p className="text-caption text-fg-muted">A favorite since {day(favorite.added_at)}</p>
+      }
       menu={
         <MoreMenu corner about={name}>
           <MenuLink to="/books/$bookId" params={{ bookId: book.id }} icon={Info}>
@@ -68,7 +70,9 @@ function FavoriteCard({ kept }: { kept: KeptPage }) {
           </MenuLink>
           <MenuItem
             icon={NoFavoriteIcon}
-            onSelect={() => keepPage({ bookId: book.id, identity, number: page, keep: false })}
+            onSelect={() =>
+              markFavorite({ bookId: book.id, identity, number: page, favorite: false })
+            }
           >
             Remove from favorites
           </MenuItem>
@@ -80,26 +84,25 @@ function FavoriteCard({ kept }: { kept: KeptPage }) {
 
 /**
  * The pages the reader made favorites while reading, series by series. A
- * page is made one with the heart in the bar at the top of the reader. The
- * server calls them kept pages.
+ * page is made one with the heart in the bar at the top of the reader.
  */
 function FavoritesPage() {
   const page = Route.useSearch().page ?? 1;
-  const kept = useKeptPages(page);
+  const favorites = useFavoritePages(page);
 
   return (
     <>
       <MyBingeParts />
       <h1 className="sr-only">Favorites</h1>
-      {kept.data?.total ? (
+      {favorites.data?.total ? (
         <p className="text-fg-muted text-metadata">
-          {count(kept.data.total, "favorite page", "favorite pages")}
+          {count(favorites.data.total, "favorite page", "favorite pages")}
         </p>
       ) : null}
 
-      {kept.isError ? (
-        <ErrorText className="mt-6">{kept.error.message}</ErrorText>
-      ) : !kept.data ? null : kept.data.total === 0 ? (
+      {favorites.isError ? (
+        <ErrorText className="mt-6">{favorites.error.message}</ErrorText>
+      ) : !favorites.data ? null : favorites.data.total === 0 ? (
         <div className="mt-8">
           <Notice icon={FavoriteIcon} title="No favorites yet">
             While you read, the heart in the bar at the top of the reader makes the page on screen a
@@ -108,7 +111,7 @@ function FavoritesPage() {
         </div>
       ) : (
         <>
-          {bySeries(kept.data.pages).map((series) => (
+          {bySeries(favorites.data.pages).map((series) => (
             <section
               key={series.id ?? "none"}
               className="mt-10"
@@ -129,7 +132,7 @@ function FavoritesPage() {
               </h2>
               <ul className={`mt-4 ${coverGridClass}`}>
                 {series.pages.map((one) => (
-                  <FavoriteCard key={`${one.book.id}-${one.page}`} kept={one} />
+                  <FavoriteCard key={`${one.book.id}-${one.page}`} favorite={one} />
                 ))}
               </ul>
             </section>
@@ -137,8 +140,8 @@ function FavoritesPage() {
           <Pages
             label="Pages of favorites"
             page={page}
-            total={kept.data.total}
-            aPage={KEPT_A_PAGE}
+            total={favorites.data.total}
+            aPage={FAVORITES_A_PAGE}
             to={(page) => ({ to: "/favorites", search: { page: page > 1 ? page : undefined } })}
           />
         </>

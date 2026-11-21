@@ -88,7 +88,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/books/{id}/kept-pages": {
+    "/api/v1/books/{id}/favorite-pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -96,10 +96,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Lists the pages of a book that the caller kept, by their numbers from 0,
-         *     in reading order.
+         * Lists the pages of a book that are favorites of the caller's, by their
+         *     numbers from 0, in reading order.
          */
-        get: operations["listKeptPagesOfBook"];
+        get: operations["listFavoritePagesOfBook"];
         put?: never;
         post?: never;
         delete?: never;
@@ -737,7 +737,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/me/kept-pages": {
+    "/api/v1/me/favorite-pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -745,13 +745,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Lists a part of the pages the caller kept, with how many there are in
+         * Lists a part of the caller's favorite pages, with how many there are in
          *     all: series by series in the order of their names, and inside a series
          *     book by book as they are read. The pages of books in no series come
          *     last. A page of a book that is not on the server now is left out, and is
          *     listed again when its book is back.
          */
-        get: operations["listKeptPages"];
+        get: operations["listFavoritePages"];
         put?: never;
         post?: never;
         delete?: never;
@@ -857,7 +857,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/pages/{identity}/{number}/kept": {
+    "/api/v1/pages/{identity}/{number}/favorite": {
         parameters: {
             query?: never;
             header?: never;
@@ -865,11 +865,17 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Keeps a page for the caller. A page already kept stays as it was. */
-        put: operations["keepPage"];
+        /**
+         * Makes a page a favorite of the caller's. A page that already is one
+         *     stays as it was.
+         */
+        put: operations["addFavoritePage"];
         post?: never;
-        /** Lets go of a page the caller kept. A page that was not kept is no error. */
-        delete: operations["letPageGo"];
+        /**
+         * Makes a page no longer a favorite of the caller's. A page that was not
+         *     one is no error.
+         */
+        delete: operations["removeFavoritePage"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2391,6 +2397,27 @@ export interface components {
          */
         ErrorCode: "invalid_request" | "unauthorized" | "invalid_credentials" | "forbidden" | "not_found" | "method_not_allowed" | "host_not_allowed" | "conflict" | "too_many_requests" | "internal";
         /**
+         * @description A favorite page of the caller's, with the book it is a page of.
+         *
+         *     It belongs to the book's `identity` and the page's number, like
+         *     progress: it stays with the page when the book's file is moved or
+         *     renamed. Everyone has their own.
+         */
+        FavoritePage: {
+            /**
+             * Format: int64
+             * @description When it became a favorite, in seconds since 1970.
+             */
+            added_at: number;
+            book: components["schemas"]["Book"];
+            /**
+             * Format: int64
+             * @description The page, from 0. Its picture is at `/pages/{identity}/{number}`,
+             *     and a small one at `/pages/{identity}/{number}/thumbnail`.
+             */
+            page: number;
+        };
+        /**
          * @description What a book is read as a part of.
          * @enum {string}
          */
@@ -2515,27 +2542,6 @@ export interface components {
         HeldTwice: {
             /** @description Its files, in the order of their paths: two at least. */
             files: components["schemas"]["HeldFile"][];
-        };
-        /**
-         * @description A page the caller kept, with the book it is a page of.
-         *
-         *     It belongs to the book's `identity` and the page's number, like
-         *     progress: it stays with the page when the book's file is moved or
-         *     renamed. Everyone has their own.
-         */
-        KeptPage: {
-            book: components["schemas"]["Book"];
-            /**
-             * Format: int64
-             * @description When it was kept, in seconds since 1970.
-             */
-            kept_at: number;
-            /**
-             * Format: int64
-             * @description The page, from 0. Its picture is at `/pages/{identity}/{number}`,
-             *     and a small one at `/pages/{identity}/{number}/thumbnail`.
-             */
-            page: number;
         };
         /** @description A letter that the names of series start with. */
         Letter: {
@@ -2807,9 +2813,9 @@ export interface components {
              */
             total: number;
         };
-        /** @description A part of the pages the caller kept. */
-        PagedKeptPages: {
-            pages: components["schemas"]["KeptPage"][];
+        /** @description A part of the caller's favorite pages. */
+        PagedFavoritePages: {
+            pages: components["schemas"]["FavoritePage"][];
             /**
              * Format: int64
              * @description How many pages the whole list holds.
@@ -3688,7 +3694,7 @@ export interface operations {
             };
         };
     };
-    listKeptPagesOfBook: {
+    listFavoritePagesOfBook: {
         parameters: {
             query?: never;
             header?: never;
@@ -5255,7 +5261,7 @@ export interface operations {
             };
         };
     };
-    listKeptPages: {
+    listFavoritePages: {
         parameters: {
             query?: {
                 /** @description How many to pass over, from the start of the list. */
@@ -5274,7 +5280,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PagedKeptPages"];
+                    "application/json": components["schemas"]["PagedFavoritePages"];
                 };
             };
         };
@@ -5484,7 +5490,7 @@ export interface operations {
             };
         };
     };
-    keepPage: {
+    addFavoritePage: {
         parameters: {
             query?: never;
             header?: never;
@@ -5498,14 +5504,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The page is kept */
+            /** @description The page is a favorite */
             204: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description The caller keeps 5,000 pages already */
+            /** @description The caller has 5,000 favorite pages already */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5525,7 +5531,7 @@ export interface operations {
             };
         };
     };
-    letPageGo: {
+    removeFavoritePage: {
         parameters: {
             query?: never;
             header?: never;
@@ -5539,7 +5545,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The page is not kept */
+            /** @description The page is not a favorite */
             204: {
                 headers: {
                     [name: string]: unknown;

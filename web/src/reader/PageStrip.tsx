@@ -20,7 +20,7 @@ const StripPage = memo(function StripPage({
   page,
   onScreen,
   first,
-  isKept,
+  isFavorite,
   onPick,
 }: {
   src: string;
@@ -28,7 +28,7 @@ const StripPage = memo(function StripPage({
   onScreen: boolean;
   /** Whether it is the first page on screen, which the strip is brought to. */
   first: boolean;
-  isKept: boolean;
+  isFavorite: boolean;
   onPick: (number: number) => void;
 }) {
   const button = useRef<HTMLButtonElement>(null);
@@ -43,7 +43,7 @@ const StripPage = memo(function StripPage({
       ref={button}
       onClick={() => onPick(page.number)}
       aria-current={onScreen ? "true" : undefined}
-      aria-label={`Page ${page.number + 1}${isKept ? ", a favorite" : ""}`}
+      aria-label={`Page ${page.number + 1}${isFavorite ? ", a favorite" : ""}`}
       className="group relative shrink-0 rounded-control text-caption text-fg-muted aria-[current]:font-semibold aria-[current]:text-fg"
     >
       <img
@@ -57,7 +57,7 @@ const StripPage = memo(function StripPage({
         className="h-24 w-auto rounded-cover bg-raised object-cover ring-1 ring-divider group-hover:ring-fg-muted group-aria-[current]:ring-2 group-aria-[current]:ring-accent"
       />
       <span className="block py-0.5 text-center tabular-nums">{page.number + 1}</span>
-      {isKept ? (
+      {isFavorite ? (
         <FavoriteIcon
           className="absolute top-1 right-1 size-4 fill-accent text-accent"
           aria-hidden="true"
@@ -71,7 +71,7 @@ export const PageStrip = memo(function PageStrip({
   identity,
   pages,
   shown,
-  kept,
+  favorites,
   rightToLeft,
   onPick,
 }: {
@@ -79,12 +79,12 @@ export const PageStrip = memo(function PageStrip({
   pages: Page[];
   /** The pages on screen, by their numbers. */
   shown: number[];
-  /** The pages that were kept, by their numbers. */
-  kept: number[];
+  /** The pages that are favorites, by their numbers. */
+  favorites: number[];
   rightToLeft: boolean;
   onPick: (number: number) => void;
 }) {
-  const keptOnes = useMemo(() => new Set(kept), [kept]);
+  const favoriteOnes = useMemo(() => new Set(favorites), [favorites]);
   return (
     <nav
       aria-label="Pages of the book"
@@ -98,7 +98,7 @@ export const PageStrip = memo(function PageStrip({
           page={page}
           onScreen={shown.includes(page.number)}
           first={page.number === shown[0]}
-          isKept={keptOnes.has(page.number)}
+          isFavorite={favoriteOnes.has(page.number)}
           onPick={onPick}
         />
       ))}

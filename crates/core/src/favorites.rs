@@ -1,6 +1,6 @@
-//! Pages a reader kept while reading, to find them again.
+//! Favorite pages: pages a reader marked while reading, to find them again.
 //!
-//! A kept page hangs on the book's identity and the page's number, like
+//! A favorite hangs on the book's identity and the page's number, like
 //! progress, so it stays with the page when the book's file is moved or
 //! renamed. Everyone has their own, and a page of a book in a library they
 //! may not read is not there for them.
@@ -10,24 +10,25 @@ use crate::catalog::{
     Book, Catalog, CatalogError, PLACE_OF, PartOf, Span, first_copy, now, reading_order,
 };
 
-/// How many pages one person keeps at most, so that the table cannot be
-/// used to store something else.
-const MOST_KEPT: i64 = 5_000;
+/// How many favorite pages one person has at most, so that the table
+/// cannot be used to store something else.
+const MOST_FAVORITES: i64 = 5_000;
 
-/// A page someone kept, with the book it is a page of.
+/// A favorite page of someone's, with the book it is a page of.
 #[derive(Clone, Debug)]
-pub struct KeptPage {
+pub struct FavoritePage {
     pub book: Book,
     /// The page, from 0.
     pub page: i64,
-    /// Seconds since 1970.
-    pub kept_at: i64,
+    /// When it became a favorite, in seconds since 1970.
+    pub added_at: i64,
 }
 
 impl Catalog {
-    /// Keeps a page of the book with this identity for `user`. A page
-    /// already kept stays as it was, with the time it was kept.
-    pub async fn keep_page(
+    /// Makes a page of the book with this identity a favorite of `user`'s.
+    /// A page that already is one stays as it was, with the time it became
+    /// one.
+    pub async fn add_favorite_page(
         &self,
         user: UserId,
         content_hash: &str,
@@ -36,60 +37,67 @@ impl Catalog {
         if !self.has_page(user, content_hash, number).await? {
             return Err(CatalogError::NoSuchPage);
         }
-        let mut keeping = self.db.begin_write().await?;
+        let mut adding = self.db.begin_write().await?;
         let others: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM kept_page \
+            "SELECT COUNT(*) FROM favorite_page \
              WHERE user_id = ?1 AND NOT (content_hash = ?2 AND page = ?3)",
         )
         .bind(user)
         .bind(content_hash)
         .bind(number)
-        .fetch_one(&mut *keeping)
+        .fetch_one(&mut *adding)
         .await?;
-        if others >= MOST_KEPT {
+        if others >= MOST_FAVORITES {
             return Err(CatalogError::Invalid(
                 "That is too many favorite pages: one person has 5,000 at most.",
             ));
         }
         sqlx::query(
-            "INSERT INTO kept_page (user_id, content_hash, page, kept_at) VALUES (?, ?, ?, ?) \
+            "INSERT INTO favorite_page (user_id, content_hash, page, added_at) VALUES (?, ?, ?, ?) \
              ON CONFLICT (user_id, content_hash, page) DO NOTHING",
         )
         .bind(user)
         .bind(content_hash)
         .bind(number)
         .bind(now())
-        .execute(&mut *keeping)
+        .execute(&mut *adding)
         .await?;
-        keeping.commit().await?;
+        adding.commit().await?;
         Ok(())
     }
 
-    /// Lets go of a page `user` kept. A page that was not kept is no error.
-    pub async fn let_page_go(
+    /// Makes a page no longer a favorite of `user`'s. A page that was not
+    /// one is no error.
+    pub async fn remove_favorite_page(
         &self,
         user: UserId,
         content_hash: &str,
         number: i64,
     ) -> Result<(), CatalogError> {
-        sqlx::query("DELETE FROM kept_page WHERE user_id = ? AND content_hash = ? AND page = ?")
-            .bind(user)
-            .bind(content_hash)
-            .bind(number)
-            .execute(self.db.pool())
-            .await?;
+        sqlx::query(
+            "DELETE FROM favorite_page WHERE user_id = ? AND content_hash = ? AND page = ?",
+        )
+        .bind(user)
+        .bind(content_hash)
+        .bind(number)
+        .execute(self.db.pool())
+        .await?;
         Ok(())
     }
 
-    /// The pages of a book that `user` kept, in reading order.
-    pub async fn kept_in(&self, user: UserId, book_id: i64) -> Result<Vec<i64>, CatalogError> {
+    /// The pages of a book that are favorites of `user`'s, in reading order.
+    pub async fn favorite_pages_in(
+        &self,
+        user: UserId,
+        book_id: i64,
+    ) -> Result<Vec<i64>, CatalogError> {
         let book = self.book(user, book_id).await?;
         // A file that could not be read has no identity and no pages.
         let Some(identity) = book.content_hash else {
             return Ok(Vec::new());
         };
         Ok(sqlx::query_scalar(
-            "SELECT page FROM kept_page WHERE user_id = ? AND content_hash = ? ORDER BY page",
+            "SELECT page FROM favorite_page WHERE user_id = ? AND content_hash = ? ORDER BY page",
         )
         .bind(user)
         .bind(identity)
@@ -97,27 +105,28 @@ impl Catalog {
         .await?)
     }
 
-    /// A part of the pages `user` kept, series by series in the order of
+    /// A part of the favorite pages of `user`, series by series in the order of
     /// their names, and inside a series book by book as they are read. The
     /// pages of books in no series come last. A page of a book that is not
     /// on the server now is left out, and is there again when its book is.
-    pub async fn kept_pages(
+    pub async fn favorite_pages(
         &self,
         user: UserId,
         span: Span,
-    ) -> Result<PartOf<KeptPage>, CatalogError> {
-        // The file that stands for a kept page's book, as `user` sees it.
-        let copy = first_copy("k");
-        let count =
-            format!("SELECT COUNT(*) FROM kept_page k WHERE k.user_id = ?1 AND {copy} IS NOT NULL");
+    ) -> Result<PartOf<FavoritePage>, CatalogError> {
+        // The file that stands for a favorite's book, as `user` sees it.
+        let copy = first_copy("f");
+        let count = format!(
+            "SELECT COUNT(*) FROM favorite_page f WHERE f.user_id = ?1 AND {copy} IS NOT NULL"
+        );
         let part = format!(
-            "SELECT b.id, k.page, k.kept_at FROM kept_page k JOIN book b ON b.id = {copy} \
-             {PLACE_OF} WHERE k.user_id = ?1 \
-             ORDER BY bs.name COLLATE natsort NULLS LAST, bs.id, {}, b.id, k.page \
+            "SELECT b.id, f.page, f.added_at FROM favorite_page f JOIN book b ON b.id = {copy} \
+             {PLACE_OF} WHERE f.user_id = ?1 \
+             ORDER BY bs.name COLLATE natsort NULLS LAST, bs.id, {}, b.id, f.page \
              LIMIT ?2 OFFSET ?3",
             reading_order()
         );
-        let (total, kept): (i64, Vec<(i64, i64, i64)>) = tokio::try_join!(
+        let (total, favorites): (i64, Vec<(i64, i64, i64)>) = tokio::try_join!(
             sqlx::query_scalar(&count)
                 .bind(user)
                 .fetch_one(self.db.pool()),
@@ -128,15 +137,15 @@ impl Catalog {
                 .fetch_all(self.db.pool()),
         )?;
 
-        let ids: Vec<i64> = kept.iter().map(|(book_id, ..)| *book_id).collect();
+        let ids: Vec<i64> = favorites.iter().map(|(book_id, ..)| *book_id).collect();
         let books = self.books_by_id(user, &ids).await?;
-        let items = kept
+        let items = favorites
             .into_iter()
-            .filter_map(|(book_id, page, kept_at)| {
-                Some(KeptPage {
+            .filter_map(|(book_id, page, added_at)| {
+                Some(FavoritePage {
                     book: books.get(&book_id)?.clone(),
                     page,
-                    kept_at,
+                    added_at,
                 })
             })
             .collect();
@@ -169,13 +178,17 @@ mod tests {
         (book.id, book.content_hash.unwrap())
     }
 
-    /// What the owner kept, as (book's name, page), and how many in all.
-    async fn kept(shelf: &Shelf, span: Span) -> (Vec<(String, i64)>, i64) {
-        let part = shelf.catalog.kept_pages(shelf.owner, span).await.unwrap();
+    /// The owner's favorites, as (book's name, page), and how many in all.
+    async fn favorites(shelf: &Shelf, span: Span) -> (Vec<(String, i64)>, i64) {
+        let part = shelf
+            .catalog
+            .favorite_pages(shelf.owner, span)
+            .await
+            .unwrap();
         let pages = part
             .items
             .into_iter()
-            .map(|kept| (kept.book.name, kept.page))
+            .map(|favorite| (favorite.book.name, favorite.page))
             .collect();
         (pages, part.total)
     }
@@ -186,48 +199,63 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn a_page_is_kept_once_and_let_go() {
+    async fn a_page_is_a_favorite_once_and_no_longer() {
         let (shelf, library_id) = library(&[("Night Runner/Night Runner 001.cbz", 4, 1)]).await;
         let (id, identity) = first_of(&shelf, library_id, "Night Runner").await;
         let catalog = &shelf.catalog;
 
-        catalog.keep_page(shelf.owner, &identity, 2).await.unwrap();
-        catalog.keep_page(shelf.owner, &identity, 0).await.unwrap();
-        // Kept again, it is still one page.
-        catalog.keep_page(shelf.owner, &identity, 2).await.unwrap();
-        assert_eq!(catalog.kept_in(shelf.owner, id).await.unwrap(), [0, 2]);
+        catalog
+            .add_favorite_page(shelf.owner, &identity, 2)
+            .await
+            .unwrap();
+        catalog
+            .add_favorite_page(shelf.owner, &identity, 0)
+            .await
+            .unwrap();
+        // Added again, it is still one favorite.
+        catalog
+            .add_favorite_page(shelf.owner, &identity, 2)
+            .await
+            .unwrap();
+        assert_eq!(
+            catalog.favorite_pages_in(shelf.owner, id).await.unwrap(),
+            [0, 2]
+        );
 
         catalog
-            .let_page_go(shelf.owner, &identity, 0)
+            .remove_favorite_page(shelf.owner, &identity, 0)
             .await
             .unwrap();
         catalog
-            .let_page_go(shelf.owner, &identity, 0)
+            .remove_favorite_page(shelf.owner, &identity, 0)
             .await
             .unwrap();
-        assert_eq!(catalog.kept_in(shelf.owner, id).await.unwrap(), [2]);
+        assert_eq!(
+            catalog.favorite_pages_in(shelf.owner, id).await.unwrap(),
+            [2]
+        );
     }
 
     #[tokio::test]
-    async fn only_a_page_that_is_there_can_be_kept() {
+    async fn only_a_page_that_is_there_can_be_a_favorite() {
         let (shelf, library_id) = library(&[("Night Runner/Night Runner 001.cbz", 4, 1)]).await;
         let (_, identity) = first_of(&shelf, library_id, "Night Runner").await;
         let catalog = &shelf.catalog;
 
         for (identity, page) in [(identity.as_str(), 4), (identity.as_str(), -1), (NOBODY, 0)] {
             assert!(matches!(
-                catalog.keep_page(shelf.owner, identity, page).await,
+                catalog.add_favorite_page(shelf.owner, identity, page).await,
                 Err(CatalogError::NoSuchPage)
             ));
         }
         assert!(matches!(
-            catalog.kept_in(shelf.owner, 999).await,
+            catalog.favorite_pages_in(shelf.owner, 999).await,
             Err(CatalogError::NotFound)
         ));
     }
 
     #[tokio::test]
-    async fn kept_pages_are_listed_by_series_and_in_parts() {
+    async fn favorites_are_listed_by_series_and_in_parts() {
         let (shelf, library_id) = library(&[
             ("Zot/Zot 001.cbz", 3, 1),
             ("Night Runner/Night Runner 002.cbz", 3, 2),
@@ -245,12 +273,12 @@ mod tests {
         ] {
             let identity = book.content_hash.as_deref().unwrap();
             catalog
-                .keep_page(shelf.owner, identity, page)
+                .add_favorite_page(shelf.owner, identity, page)
                 .await
                 .unwrap();
         }
 
-        let (pages, total) = kept(&shelf, ALL).await;
+        let (pages, total) = favorites(&shelf, ALL).await;
         assert_eq!(total, 4);
         assert_eq!(
             pages,
@@ -267,30 +295,39 @@ mod tests {
             limit: 2,
         };
         assert_eq!(
-            kept(&shelf, last).await,
+            favorites(&shelf, last).await,
             (vec![("Zot 001".to_owned(), 1)], 4)
         );
     }
 
     #[tokio::test]
-    async fn kept_pages_are_each_readers_own() {
+    async fn favorites_are_each_readers_own() {
         let (shelf, library_id) = library(&[("Night Runner/Night Runner 001.cbz", 4, 1)]).await;
         let (id, identity) = first_of(&shelf, library_id, "Night Runner").await;
         let catalog = &shelf.catalog;
         let member = accounts::testing::member(&catalog.db, "Ana", &[library_id]).await;
         let stranger = accounts::testing::member(&catalog.db, "Ben", &[]).await;
 
-        catalog.keep_page(shelf.owner, &identity, 1).await.unwrap();
-        catalog.keep_page(member, &identity, 3).await.unwrap();
-        assert_eq!(catalog.kept_in(shelf.owner, id).await.unwrap(), [1]);
-        assert_eq!(catalog.kept_in(member, id).await.unwrap(), [3]);
+        catalog
+            .add_favorite_page(shelf.owner, &identity, 1)
+            .await
+            .unwrap();
+        catalog
+            .add_favorite_page(member, &identity, 3)
+            .await
+            .unwrap();
+        assert_eq!(
+            catalog.favorite_pages_in(shelf.owner, id).await.unwrap(),
+            [1]
+        );
+        assert_eq!(catalog.favorite_pages_in(member, id).await.unwrap(), [3]);
 
-        // Someone who may not read the library has no such page to keep.
+        // Someone who may not read the library has no such page to mark.
         assert!(matches!(
-            catalog.keep_page(stranger, &identity, 1).await,
+            catalog.add_favorite_page(stranger, &identity, 1).await,
             Err(CatalogError::NoSuchPage)
         ));
-        let none = catalog.kept_pages(stranger, ALL).await.unwrap();
+        let none = catalog.favorite_pages(stranger, ALL).await.unwrap();
         assert_eq!((none.items.len(), none.total), (0, 0));
     }
 }
