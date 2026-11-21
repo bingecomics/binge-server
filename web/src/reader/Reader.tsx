@@ -1,7 +1,6 @@
 import { useCanGoBack, useNavigate, useRouter } from "@tanstack/react-router";
 import {
   ArrowLeft,
-  Bookmark,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -31,6 +30,7 @@ import { usePageProblem, useSaveProgress } from "../api/reading";
 import { Button } from "../components/Button";
 import { PageAsCover } from "../components/CoverChoices";
 import { isOpenOverPage, Menu } from "../components/Menu";
+import { FavoriteIcon } from "../components/MyBinge";
 import { called } from "../format";
 import type { Followed } from "./following";
 import { backFrom } from "./home";
@@ -620,10 +620,12 @@ export function Reader({
           onClick={toggleKept}
           className={barButtonClass}
           aria-pressed={keptShown.length > 0}
-          aria-label="Keep this page"
-          title={keptShown.length > 0 ? "Kept. Press to let it go" : "Keep this page"}
+          aria-label="Favorite page"
+          title={
+            keptShown.length > 0 ? "A favorite. Press to remove it" : "Add this page to favorites"
+          }
         >
-          <Bookmark
+          <FavoriteIcon
             className={`size-5 ${keptShown.length > 0 ? "fill-current" : ""}`}
             aria-hidden="true"
           />

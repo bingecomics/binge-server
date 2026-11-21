@@ -5,8 +5,8 @@ import { gotNoAnswer } from "../api/client";
 import { useCollections, useCreateCollection } from "../api/collections";
 import { Button } from "../components/Button";
 import { CollectionCard } from "../components/CollectionCard";
+import { MyBingeParts } from "../components/MyBinge";
 import { NameAndSummaryDialog } from "../components/NameAndSummary";
-import { saidByTheMenuClass } from "../components/NavLink";
 import { Notice, ServerNotAnswering } from "../components/Notice";
 import { ErrorText } from "../components/text";
 import { YoursAndShared } from "../components/YoursAndShared";
@@ -37,11 +37,10 @@ function CollectionsPage() {
 
   return (
     <>
+      <MyBingeParts />
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className={`mb-1 font-bold text-screen-title tracking-tight ${saidByTheMenuClass}`}>
-            Collections
-          </h1>
+          <h1 className="sr-only">Collections</h1>
           <p className="text-fg-muted text-metadata">
             {count(collections.data.length, "collection", "collections")}
           </p>

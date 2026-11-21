@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { gotNoAnswer } from "../api/client";
 import { useWantToRead, WANTED_A_PAGE } from "../api/wanted";
 import { coverGridClass } from "../components/Cover";
-import { saidByTheMenuClass } from "../components/NavLink";
+import { MyBingeParts } from "../components/MyBinge";
 import { Notice, ServerNotAnswering } from "../components/Notice";
 import { Pages, pageAsked } from "../components/Pages";
 import { SeriesCard } from "../components/SeriesCard";
@@ -40,9 +40,8 @@ function WantToReadPage() {
   const { series, total } = wanted.data;
   return (
     <>
-      <h1 className={`mb-1 font-bold text-screen-title tracking-tight ${saidByTheMenuClass}`}>
-        Want to read
-      </h1>
+      <MyBingeParts />
+      <h1 className="sr-only">Want to read</h1>
       <p className="text-fg-muted text-metadata">{seriesCount(total)}</p>
 
       {total === 0 ? (

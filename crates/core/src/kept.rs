@@ -48,7 +48,7 @@ impl Catalog {
         .await?;
         if others >= MOST_KEPT {
             return Err(CatalogError::Invalid(
-                "That is too many kept pages: one person keeps 5,000 at most.",
+                "That is too many favorite pages: one person has 5,000 at most.",
             ));
         }
         sqlx::query(

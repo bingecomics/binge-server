@@ -16,6 +16,12 @@ export function buttonClass(variant: keyof typeof variants = "secondary"): strin
   return `${base} ${variants[variant]}`;
 }
 
+/**
+ * How a link looks that is one of a few choices of what a page shows. The
+ * one marked as current is the one chosen.
+ */
+export const choiceClass = `${buttonClass()} aria-[current]:bg-fg aria-[current]:text-background`;
+
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: keyof typeof variants };
 
 export function Button({ variant = "secondary", className = "", type = "button", ...rest }: Props) {

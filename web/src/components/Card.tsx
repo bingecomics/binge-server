@@ -26,7 +26,7 @@ const liftClass =
 
 /**
  * The one card of the app: a cover and up to three lines under it, for a
- * book, a series, a group of a series, a reading list or a kept page, on
+ * book, a series, a group of a series, a reading list or a favorite page, on
  * every page that shows them.
  *
  * The lines are always the same three. `name` is what the card is called,

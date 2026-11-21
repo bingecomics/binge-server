@@ -32,29 +32,19 @@ export const navHeadingClass = "font-semibold text-caption text-fg-muted upperca
 /** Routes that need nothing filled in. */
 type PlainRoute = Exclude<FileRouteTypes["to"], `${string}$${string}`>;
 
-/**
- * A link of a menu, marked while its page is the one shown. `withPagesUnder`
- * keeps it marked on the pages under its own, as a list's page is under the
- * page of all lists.
- */
+/** A link of a menu, marked while its page is the one shown. */
 export function NavLink({
   to,
   icon: Icon,
   label,
-  withPagesUnder = false,
 }: {
   to: PlainRoute;
   /** One of the icon set's, or one of Binge's own. */
   icon: ComponentType<{ className?: string }>;
   label: string;
-  withPagesUnder?: boolean;
 }) {
   return (
-    <Link
-      to={to}
-      className={navLinkClass}
-      activeOptions={{ exact: !withPagesUnder, includeSearch: false }}
-    >
+    <Link to={to} className={navLinkClass} activeOptions={{ exact: true, includeSearch: false }}>
       <Icon className="size-5 shrink-0" />
       <span className="whitespace-nowrap">{label}</span>
     </Link>

@@ -785,6 +785,19 @@ Built (2026-11-20): everything below
 - A scan adds what the files it read name, and takes nothing out. No file
   is changed.
 
+#### P1. My Binge
+
+Built (2026-11-20): everything below.
+
+- The side menu has one entry for what is a person's own, My Binge, in
+  place of one entry each: want to read, the reading lists, the
+  collections and the favorite pages. The menu is Home, My Binge, the
+  views and the libraries.
+- Each of the four pages has the four as a row of choices over it. My
+  Binge opens on want to read.
+- The pages a person kept while reading are called favorites, and their
+  mark is a heart. The API still calls them kept pages.
+
 ### Later, in outline only
 
 These follow the web app steps and P1 above.

@@ -10,8 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as HistoryRouteImport } from './routes/history'
-import { Route as KeptRouteImport } from './routes/kept'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as WantToReadRouteImport } from './routes/want-to-read'
@@ -41,14 +41,14 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FavoritesRoute = FavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const HistoryRoute = HistoryRouteImport.update({
   id: '/history',
   path: '/history',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const KeptRoute = KeptRouteImport.update({
-  id: '/kept',
-  path: '/kept',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -171,8 +171,8 @@ const SeriesSeriesIdGroupsGroupIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/favorites': typeof FavoritesRoute
   '/history': typeof HistoryRoute
-  '/kept': typeof KeptRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRouteWithChildren
   '/want-to-read': typeof WantToReadRoute
@@ -199,8 +199,8 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/favorites': typeof FavoritesRoute
   '/history': typeof HistoryRoute
-  '/kept': typeof KeptRoute
   '/search': typeof SearchRoute
   '/want-to-read': typeof WantToReadRoute
   '/books/$bookId': typeof BooksBookIdRoute
@@ -227,8 +227,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/favorites': typeof FavoritesRoute
   '/history': typeof HistoryRoute
-  '/kept': typeof KeptRoute
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRouteWithChildren
   '/want-to-read': typeof WantToReadRoute
@@ -257,8 +257,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/favorites'
     | '/history'
-    | '/kept'
     | '/search'
     | '/settings'
     | '/want-to-read'
@@ -285,8 +285,8 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/favorites'
     | '/history'
-    | '/kept'
     | '/search'
     | '/want-to-read'
     | '/books/$bookId'
@@ -312,8 +312,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/favorites'
     | '/history'
-    | '/kept'
     | '/search'
     | '/settings'
     | '/want-to-read'
@@ -341,8 +341,8 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FavoritesRoute: typeof FavoritesRoute
   HistoryRoute: typeof HistoryRoute
-  KeptRoute: typeof KeptRoute
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRouteWithChildren
   WantToReadRoute: typeof WantToReadRoute
@@ -370,18 +370,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/favorites': {
+      id: '/favorites'
+      path: '/favorites'
+      fullPath: '/favorites'
+      preLoaderRoute: typeof FavoritesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/history': {
       id: '/history'
       path: '/history'
       fullPath: '/history'
       preLoaderRoute: typeof HistoryRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/kept': {
-      id: '/kept'
-      path: '/kept'
-      fullPath: '/kept'
-      preLoaderRoute: typeof KeptRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -574,8 +574,8 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FavoritesRoute: FavoritesRoute,
   HistoryRoute: HistoryRoute,
-  KeptRoute: KeptRoute,
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRouteWithChildren,
   WantToReadRoute: WantToReadRoute,

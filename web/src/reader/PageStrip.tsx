@@ -1,11 +1,11 @@
-import { Bookmark } from "lucide-react";
 import { memo, useEffect, useMemo, useRef } from "react";
 import { type Page, smallPageUrl } from "../api/client";
+import { FavoriteIcon } from "../components/MyBinge";
 
 /**
  * The pages of the book as a strip of small pictures to jump by, over the
  * bar at the bottom. The pages on screen are marked and brought to the
- * middle, and a page that was kept carries its mark. It runs the way the
+ * middle, and a favorite page carries its heart. It runs the way the
  * book is read.
  *
  * A picture is asked for when it comes into view, so a long book costs
@@ -43,7 +43,7 @@ const StripPage = memo(function StripPage({
       ref={button}
       onClick={() => onPick(page.number)}
       aria-current={onScreen ? "true" : undefined}
-      aria-label={`Page ${page.number + 1}${isKept ? ", kept" : ""}`}
+      aria-label={`Page ${page.number + 1}${isKept ? ", a favorite" : ""}`}
       className="group relative shrink-0 rounded-control text-caption text-fg-muted aria-[current]:font-semibold aria-[current]:text-fg"
     >
       <img
@@ -58,7 +58,7 @@ const StripPage = memo(function StripPage({
       />
       <span className="block py-0.5 text-center tabular-nums">{page.number + 1}</span>
       {isKept ? (
-        <Bookmark
+        <FavoriteIcon
           className="absolute top-1 right-1 size-4 fill-accent text-accent"
           aria-hidden="true"
         />

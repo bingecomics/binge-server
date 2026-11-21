@@ -283,8 +283,8 @@ from any later request brings the sign-in page back.
 **The frame around every page** but the reader's is a bar at the top and a
 menu beside the page. The bar has the name, which leads Home, the search
 box, what the server is doing, the settings, and who is signed in: that
-last one opens what the person read, their account, their tokens and the
-way out. What the server is doing is an icon that opens a short list:
+last one opens My Binge, what the person read, their account, their
+tokens and the way out. What the server is doing is an icon that opens a short list:
 each library with the state of its scan, for the owner how many of its
 files could not be read, with the way to them, and who is reading now.
 The icon carries a dot while a scan runs or a file waits to be looked
@@ -294,8 +294,13 @@ from anywhere. On every page but the settings', a window at least 1024 px
 wide also has a slider there for the size of the covers: one size for every grid
 and row, from 6 to 13 rem, kept by the server for each person
 (`cover-size`, see "What a person chose" below). The menu lists
-Home, what the person wants to read, the reading lists, the collections,
-the kept pages, the views kept for the menu and the libraries. On a settings page it is the settings' own menu
+Home, My Binge, the views kept for the menu and the libraries. My Binge
+is one entry for what is a person's own: what they want to read
+(`/want-to-read`, where it opens), the reading lists (`/lists`) and the
+collections (`/collections`) they see, and their favorite pages
+(`/favorites`). Each of those pages has the four as a row of choices over
+it, and the entry is marked on all of them and on the pages under them.
+In a narrow window the menu of who is signed in leads to it. On a settings page it is the settings' own menu
 instead, a page for each part: `/settings/account`,
 `/settings/tokens`, and for the owner `/settings/users`,
 `/settings/libraries`, `/settings/views` and `/settings/server`. A narrow
@@ -959,7 +964,9 @@ there or not the caller's to read are passed over, and the answer says how
 many books changed. One request names 10,000 ids at most. In the core it is `Catalog::mark_read`, which a tool of
 the MCP server can call as it is.
 
-**Kept pages.** A reader keeps a page to find it again:
+**Kept pages.** The web app calls them favorites and marks them with a
+heart; the API and the database call them kept pages. A reader keeps a
+page to find it again:
 `PUT /pages/{identity}/{number}/kept`, and `DELETE` to let it go. Like
 progress it is a row per reader, identity and page number with no link to
 the `book` table (`kept_page`), so it stays with the page when the file
@@ -1063,11 +1070,12 @@ without the bar at the top or the menu beside the page.
   the reader): turning pages then saves nothing, so it moves no progress
   and writes no sitting. The bar at the top says so, and pressing that
   records from the page on screen.
-- The bar at the top keeps the page on screen, or lets it go. Kept pages
-  are listed at `/kept`, by series, each opening its book on that page
-  for a look (`page` in the address, from 1).
+- The heart in the bar at the top makes the page on screen a favorite,
+  or takes it off. Favorite pages are listed at `/favorites`, by series,
+  each opening its book on that page for a look (`page` in the address,
+  from 1).
 - The bar at the bottom opens a strip of the book's pages as small
-  pictures to jump by, with the pages on screen and the kept ones marked.
+  pictures to jump by, with the pages on screen and the favorite ones marked.
   A picture is asked for when it comes into view.
 - Closing goes back to where the book was opened from. A book opened by its
   address goes to its series, or to its library when it is in no series.

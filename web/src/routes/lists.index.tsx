@@ -5,8 +5,8 @@ import { gotNoAnswer } from "../api/client";
 import { useCreateList, useReadingLists } from "../api/lists";
 import { Button, buttonClass } from "../components/Button";
 import { ListCard } from "../components/ListCard";
+import { MyBingeParts } from "../components/MyBinge";
 import { NameAndSummaryDialog } from "../components/NameAndSummary";
-import { saidByTheMenuClass } from "../components/NavLink";
 import { Notice, ServerNotAnswering } from "../components/Notice";
 import { ErrorText } from "../components/text";
 import { YoursAndShared } from "../components/YoursAndShared";
@@ -37,11 +37,10 @@ function ListsPage() {
 
   return (
     <>
+      <MyBingeParts />
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className={`mb-1 font-bold text-screen-title tracking-tight ${saidByTheMenuClass}`}>
-            Reading lists
-          </h1>
+          <h1 className="sr-only">Reading lists</h1>
           <p className="text-fg-muted text-metadata">
             {count(lists.data.length, "reading list", "reading lists")}
           </p>

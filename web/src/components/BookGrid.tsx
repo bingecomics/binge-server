@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import type { Book } from "../api/client";
 import { BookCard } from "./BookCard";
-import { buttonClass } from "./Button";
+import { choiceClass } from "./Button";
 import { coverGridClass } from "./Cover";
 import { shelfTitleClass } from "./Shelf";
 
@@ -45,7 +45,7 @@ function Choice({ show, chosen, children }: Shown & { chosen: boolean; children:
       search={(asked) => ({ ...asked, show })}
       {...choiceProps}
       aria-current={chosen ? "true" : undefined}
-      className={`${buttonClass()} aria-[current]:bg-fg aria-[current]:text-background`}
+      className={choiceClass}
     >
       {children}
     </Link>
